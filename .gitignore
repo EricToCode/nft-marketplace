@@ -1,0 +1,9 @@
+node_modules
+artifacts
+cache
+ignition
+uploads
+db.sqlite
+hardhat.config.js
+MarketplaceNFT.json
+.env

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Item Details</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="browse.html">← Back</a>
+    <a href="index.html">Home</a>
+  </nav>
+  <div class="container" id="info"></div>
+  <script>
+    fetch('/api/me').then(r => { if (r.status === 401) window.location = 'index.html'; });
+    async function show() {
+      const id   = new URLSearchParams(location.search).get('id');
+      const item = await fetch(`/api/items/${id}`).then(r => r.json());
+      if (item.error) return info.textContent = 'Error: ' + item.error;
+      let html = `<h1>${item.name}</h1>`;
+      html += `<p><strong>Category:</strong> ${item.category}</p>`;
+      html += `<p><strong>Status:</strong> ${item.status}</p>`;
+      if (item.description) html += `<p>${item.description}</p>`;
+      if (item.front_image)  html += `<img src="${item.front_image}" width="200"><br>`;
+      if (item.back_image)   html += `<img src="${item.back_image}" width="200"><br>`;
+      if (item.category === 'watches') {
+        html += `<p>Serial #: ${item.serial_number}</p>`;
+        html += `<p>Case Color: ${item.case_color}</p>`;
+        html += `<p>Dial Color: ${item.dial_color}</p>`;
+      } else {
+        html += `<p>Rarity: ${item.rarity}</p>`;
+        html += `<p>Set #: ${item.set_number}</p>`;
+      }
+      document.getElementById('info').innerHTML = html;
+    }
+    show();
+  </script>
+</body>
+</html>
