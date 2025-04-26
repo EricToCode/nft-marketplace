@@ -9,12 +9,23 @@ An NFT-based authentication marketplace for selling rare/collector items
 The idea is to use NFTs to authenticate products sold on the platform.
 An additional idea is to use a blockchain (custom or existing such as ethereum platform) to authenticate user access to private data.
 
-CURRENT PROGRESS:
+CURRENT PROGRESS //remove for prod:
 
-need to fix switch minting for pokemon card type
+ -- just added console.log for pokemon card minting
 
 minting feature done
 need to implement buyer offer / seller accept transaction
+
+
+
+
+
+
+
+
+
+
+.ENV:
 
 security (or lack of), create .env file with these before running:
 PINATA_API_KEY=f3230847639260b83f3a

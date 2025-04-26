@@ -510,12 +510,29 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
 
     try {
         // --- 2. Extract & Validate Input Data --- (Keep as is)
-        const { name, description, serialNumber, caseColor, dialColor, category } = req.body;
+        const {
+            name, description, category, // Common fields
+            serialNumber, caseColor, dialColor, // Watch fields
+            rarity, setNumber // Pokemon fields
+        } = req.body;
         const frontFile = req.files?.frontImage?.[0];
         const backFile = req.files?.backImage?.[0];
         /* ... logging and validation ... */
         if (!frontFile.path || !fs.existsSync(frontFile.path)) { /* ... */ }
         if (!backFile.path || !fs.existsSync(backFile.path)) { /* ... */ }
+
+        // --- Category-specific validation ---
+        if (category === 'watches') {
+            if (!serialNumber || !caseColor || !dialColor) {
+                throw new Error('Missing required watch fields: serialNumber, caseColor, dialColor.');
+            }
+            console.log("Watch inputs validated.");
+        } else if (category === 'pokemon') {
+            if (!rarity || !setNumber) {
+                throw new Error('Missing required Pokémon fields: rarity, setNumber.');
+            }
+            console.log("Pokémon inputs validated.");
+        }
 
         // --- 3. Upload Images to IPFS via Pinata ---
         console.log("Uploading images to Pinata using @pinata/sdk...");
@@ -557,34 +574,33 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
         // --- 4. Create Metadata JSON ---
         console.log("Creating metadata JSON...");
         const metadata = {
-            name: name, // Use name from request body
-            description: description, // Use description from request body
+            name: name,
+            description: description,
             images: [
-                `ipfs://${frontIpfsHash}`, // Use front image IPFS hash
-                `ipfs://${backIpfsHash}`    // Use back image IPFS hash
+                `ipfs://${frontIpfsHash}`,
+                `ipfs://${backIpfsHash}`
             ],
-            attributes: [
-                {
-                    "trait_type": "SerialNumber",
-                    "value": serialNumber // Use serialNumber from request body
-                },
-                {
-                    "trait_type": "Case Color",
-                    "value": caseColor // Use caseColor from request body
-                },
-                {
-                    "trait_type": "Dial Color",
-                    "value": dialColor // Use dialColor from request body
-                }
-                // Add other category-specific attributes here if needed in the future
-            ]
+            attributes: [] // Initialize attributes array
         };
+
+        // Add attributes based on category
+        if (category === 'watches') {
+            metadata.attributes.push(
+                { "trait_type": "SerialNumber", "value": serialNumber },
+                { "trait_type": "Case Color", "value": caseColor },
+                { "trait_type": "Dial Color", "value": dialColor }
+            );
+        } else if (category === 'pokemon') {
+            metadata.attributes.push(
+                { "trait_type": "Rarity", "value": rarity },
+                { "trait_type": "Set Number", "value": setNumber }
+            );
+        }
         console.log("Metadata created:", JSON.stringify(metadata, null, 2));
 
         // --- 5. Upload Metadata JSON to IPFS via Pinata ---
         console.log("Uploading metadata to Pinata using @pinata/sdk...");
         try {
-            // --- CHANGE: Use pinJSONToIPFS method ---
             const metaPinOptions = {
                 pinataMetadata: { name: `Metadata_${name.replace(/\s+/g, '_')}_${Date.now()}.json` }
                 // pinataOptions: { cidVersion: 1 } // Optional
@@ -595,10 +611,10 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
             tokenURI = `ipfs://${metadataIpfsHash}`;
             console.log(`Metadata uploaded: ${metadataIpfsHash}`);
             console.log(`Token URI: ${tokenURI}`);
-            // --- END CHANGE ---
+
         } catch (pinError) {
             console.error("Error uploading metadata to Pinata:", pinError.message || pinError);
-             // --- CHANGE: Check for API Key specific errors ---
+             // --- Check for API Key specific errors ---
              if (pinError.message?.includes('Authentication failed') || pinError.message?.includes('Invalid authentication')) {
                  throw new Error('Failed to upload metadata to IPFS: Invalid Pinata API Key or Secret.');
             } else if (pinError.response?.data?.error) {
@@ -607,7 +623,6 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
             } else {
                  throw new Error(`Failed to upload metadata to IPFS. ${pinError.message}`);
             }
-             // --- END CHANGE ---
         }
 
         // --- Pre-Mint Validation --- (Keep as is)
@@ -655,9 +670,15 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
         console.log(`  Transaction Hash: ${mintTransaction.hash}`);
         console.log(`  Item Name: ${name}`); // Log other details if needed
         console.log(`  Description: ${description}`);
-        console.log(`  Serial Number: ${serialNumber}`);
-        console.log(`  Case Color: ${caseColor}`);
-        console.log(`  Dial Color: ${dialColor}`);
+        if (category === 'watches') {
+            console.log(`  Serial Number: ${serialNumber}`);
+            console.log(`  Case Color: ${caseColor}`);
+            console.log(`  Dial Color: ${dialColor}`);
+        } else if (category === 'pokemon') {
+            console.log(`  Rarity: ${rarity}`);
+            console.log(`  Set Number: ${setNumber}`);
+        }
+
         console.log("--------------------------------------------------");
 
     } catch (error) { // Catch errors from validation, Pinata uploads, or pre-mint checks
