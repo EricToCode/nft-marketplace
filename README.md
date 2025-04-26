@@ -11,6 +11,8 @@ An additional idea is to use a blockchain (custom or existing such as ethereum p
 
 CURRENT PROGRESS:
 
+need to fix switch minting for pokemon card type
+
 minting feature done
 need to implement buyer offer / seller accept transaction
 
