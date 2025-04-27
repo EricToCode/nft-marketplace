@@ -11,12 +11,12 @@ An additional idea is to use a blockchain (custom or existing such as ethereum p
 
 CURRENT PROGRESS //remove for prod:
 
-need to implement buyer offer / seller accept transaction
-++ need to add item.owner_user_id in post.js when posting new items
-
--- funds will be held in escrow by a smart contract
--- fees (0.002 eth) should be taken from both the buyer and seller
-+ feature to inspect transaction history
+done
+- mint new NFTs
+- post items
+- browse items
+- check transaction history
+- buy / sell items
 
 
 
