@@ -34,82 +34,15 @@
   <nav>
     <a href="index.html">Home</a>
     <a href="post.html">Post</a>
+    <a href="browse.html">Browse</a>
     <a href="mint.html">Mint</a>
+    <a href="transactions.html">Transactions</a>
   </nav>
   <div class="container">
     <h1>Items for Sale</h1>
     <ul id="list"></ul>
     <p id="empty" style="display:none;">No listings yet.</p>
   </div>
-  <script>
-    // Define the gateway prefix (should match the one used in server.js if possible)
-    const IPFS_GATEWAY_PREFIX = "https://gateway.pinata.cloud/ipfs/"; // Or your preferred gateway
-
-    fetch('/api/me').then(r => {
-      if (r.status === 401) window.location = 'index.html';
-    });
-
-    // --- Function to create a displayable image URL ---
-    function getImageUrl(ipfsUri) {
-        if (!ipfsUri || !ipfsUri.startsWith("ipfs://")) {
-            // Return a placeholder or null if the URI is invalid
-            return null; // Or path to a placeholder image e.g., '/placeholder.png';
-        }
-        // Extract CID and build gateway URL
-        const cid = ipfsUri.substring(7);
-        return `${IPFS_GATEWAY_PREFIX}${cid}`;
-    }
-
-    async function load() {
-      try {
-        const response = await fetch('/api/items');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const items = await response.json();
-        const ul = document.getElementById('list');
-        const emptyMsg = document.getElementById('empty');
-
-        ul.innerHTML = ''; // Clear previous list items
-
-        if (!items || items.length === 0) {
-          emptyMsg.style.display = 'block';
-          return;
-        }
-
-        emptyMsg.style.display = 'none'; // Hide empty message if items exist
-
-        items.forEach(item => {
-          const li = document.createElement('li');
-
-          // --- Create and add image element ---
-          const img = document.createElement('img');
-          const imageUrl = getImageUrl(item.front_image); // Use helper function
-          if (imageUrl) {
-              img.src = imageUrl;
-              img.alt = item.name || 'Item image'; // Add alt text
-              // Optional: Add error handling for broken images
-              img.onerror = () => { img.style.display='none'; }; // Hide if image fails to load
-          } else {
-              // Optionally display a placeholder if no valid image URL
-              img.style.display = 'none'; // Or set src to a placeholder
-          }
-          li.appendChild(img); // Add image to list item
-
-          // --- Create and add link element ---
-          const a = document.createElement('a');
-          a.href = `item.html?id=${item.id}`;
-          a.textContent = `${item.name || 'Unnamed Item'} (${item.category || 'N/A'}) [${item.status || 'N/A'}]`;
-          li.appendChild(a); // Add link to list item
-
-          ul.appendChild(li); // Add list item to the list
-        });
-      } catch (error) {
-        console.error("Failed to load items:", error);
-        document.getElementById('list').innerHTML = '<li>Error loading items. Please try again later.</li>';
-      }
-    }
-    load();
-  </script>
+  <script src="browse.js"></script>
 </body>
 </html>

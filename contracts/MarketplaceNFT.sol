@@ -24,8 +24,6 @@ contract MarketplaceNFT is ERC721URIStorage, Ownable {
         Ownable(initialOwner) // Set the initial owner (your server's wallet)
     {
         // _nextTokenId defaults to 0. First token minted will have ID 0.
-        // Uncomment next line if you want IDs to start from 1.
-        // _nextTokenId = 1;
     }
 
     /**
@@ -64,12 +62,6 @@ contract MarketplaceNFT is ERC721URIStorage, Ownable {
     function getNextTokenId() public view returns (uint256) {
         return _nextTokenId;
     }
-
-    // --- Overrides ---
-
-    // Removed the explicit _burn override as it wasn't adding custom logic
-    // and caused compilation errors with non-virtual base function.
-    // The standard burn functionality is inherited.
 
     /**
      * @dev See {ERC721URIStorage-tokenURI}.

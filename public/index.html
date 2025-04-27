@@ -2,15 +2,33 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Marketplace Login</title>
+  <title>Marketplace Home</title>
   <link rel="stylesheet" href="style.css">
+  <style>
+      /* Basic styling for offer sections */
+      .offers-section { margin-top: 30px; padding: 15px; border: 1px solid #eee; border-radius: 8px; }
+      .offers-section h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+      .offer-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dotted #ccc; }
+      .offer-item:last-child { border-bottom: none; }
+      .offer-details { flex-grow: 1; margin-right: 15px; }
+      .offer-details span { display: block; font-size: 0.9em; color: #555; }
+      .offer-actions button { margin-left: 5px; padding: 5px 10px; cursor: pointer; }
+      .status-processing { font-style: italic; color: orange; }
+      .status-active { font-style: italic; color: blue; }
+      .status-message { margin-top: 5px; font-size: 0.9em; }
+      .error-message { color: red; }
+      .success-message { color: green; }
+  </style>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js" integrity="sha512-FDcVY+g7vc5CXANbrTSg1K5qLyriCsGDYCE02Li1tXEYdNQPvLPHNE+rT2Mjei8N7fZbe0WLhw27j2SrGRpdMg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
   <nav>
+    <a id="btnLogout">Logout</a>
     <a href="index.html">Home</a>
     <a href="post.html">Post</a>
     <a href="browse.html">Browse</a>
     <a href="mint.html">Mint</a>
+    <a href="transactions.html">Transactions</a>
   </nav>
   <div class="container" id="auth">
     <h2>Register</h2>
@@ -27,8 +45,20 @@
   <div class="container" id="wallet" style="display:none; text-align:center;">
     <h2>Welcome, <span id="display-user"></span></h2>
     <button id="btnConnect">Connect MetaMask</button>
-    <p>Wallet: <span id="wallet-address"></span></p>
+    <p>Wallet: <span id="wallet-address">Not Connected</span></p> </div>
+
+  <div class="container" id="incoming-offers" style="display: none;">
+      <h3>Incoming Offers (You are Seller)</h3>
+      <ul id="incoming-list"></ul>
+      <p id="no-incoming" style="display:none;">You have no active incoming offers.</p>
   </div>
-  <script src="app.js"></script>
+
+  <div class="container" id="outgoing-offers" style="display: none;">
+      <h3>My Active Offers (You are Buyer)</h3>
+      <ul id="outgoing-list"></ul>
+      <p id="no-outgoing" style="display:none;">You have no active outgoing offers.</p>
+  </div>
+  <script src="app.js"></script> 
+
 </body>
 </html>

@@ -5,115 +5,28 @@
   <title>Item Details</title>
   <link rel="stylesheet" href="style.css">
    <style>
-    /* Optional: Basic styling for item details */
     .container { max-width: 700px; margin: 20px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
-    #item-images img {
-      max-width: 45%; /* Display images side-by-side */
-      height: auto;
-      margin: 5px;
-      border-radius: 4px;
-      border: 1px solid #ddd;
-      vertical-align: top; /* Align images nicely */
-    }
+    #item-images img { max-width: 45%; height: auto; margin: 5px; border-radius: 4px; border: 1px solid #ddd; vertical-align: top; }
     #info p { margin: 10px 0; }
     .error-message { color: red; font-weight: bold; }
-  </style>
+    .success-message { color: green; font-weight: bold; }
+    #action-area button, #action-area input { margin-top: 10px; padding: 8px 15px; font-size: 1em; }
+    #action-area label { margin-right: 5px; }
+    #offer-status { margin-top: 15px; font-weight: bold; }
+   </style>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js" integrity="sha512-FDcVY+g7vc5CXANbrTSg1K5qLyriCsGDYCE02Li1tXEYdNQPvLPHNE+rT2Mjei8N7fZbe0WLhw27j2SrGRpdMg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
   <nav>
-    <a href="browse.html">← Back</a>
     <a href="index.html">Home</a>
+    <a href="post.html">Post</a>
+    <a href="browse.html">Browse</a>
+    <a href="mint.html">Mint</a>
+    <a href="transactions.html">Transactions</a>
   </nav>
   <div class="container" id="info">Loading item details...</div>
-
-  <script>
-    // Define the gateway prefix (should match the one used in server.js if possible)
-    const IPFS_GATEWAY_PREFIX = "https://gateway.pinata.cloud/ipfs/"; // Or your preferred gateway
-
-    // --- Function to create a displayable image URL ---
-    function getImageUrl(ipfsUri) {
-        if (!ipfsUri || !ipfsUri.startsWith("ipfs://")) {
-            // Return null if the URI is invalid
-            return null;
-        }
-        // Extract CID and build gateway URL
-        const cid = ipfsUri.substring(7);
-        return `${IPFS_GATEWAY_PREFIX}${cid}`;
-    }
-
-    fetch('/api/me').then(r => { if (r.status === 401) window.location = 'index.html'; });
-
-    async function show() {
-      const infoDiv = document.getElementById('info');
-      const id = new URLSearchParams(location.search).get('id');
-
-      if (!id) {
-          infoDiv.innerHTML = '<p class="error-message">Error: No item ID specified.</p>';
-          return;
-      }
-
-      try {
-        const response = await fetch(`/api/items/${id}`);
-        if (!response.ok) {
-            const errorBody = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
-            throw new Error(errorBody.error || `HTTP error! status: ${response.status}`);
-        }
-        const item = await response.json();
-
-        if (!item || item.error) {
-          throw new Error(item.error || 'Item not found.');
-        }
-
-        // Start building HTML
-        let html = `<h1>${item.name || 'Unnamed Item'}</h1>`;
-        html += `<p><strong>Category:</strong> ${item.category || 'N/A'}</p>`;
-        html += `<p><strong>Status:</strong> ${item.status || 'N/A'}</p>`;
-        if (item.description) html += `<p>${item.description}</p>`;
-
-        // --- Add images using the helper function ---
-        html += '<div id="item-images">'; // Container for images
-        const frontImageUrl = getImageUrl(item.front_image);
-        const backImageUrl = getImageUrl(item.back_image);
-
-        if (frontImageUrl) {
-          html += `<img src="${frontImageUrl}" alt="Front image of ${item.name || 'item'}" title="Front View">`;
-        } else {
-          html += '<p><em>Front image not available.</em></p>';
-        }
-        if (backImageUrl) {
-          html += `<img src="${backImageUrl}" alt="Back image of ${item.name || 'item'}" title="Back View">`;
-        } else {
-           // Don't necessarily need to show a message if back image is missing
-        }
-        html += '</div>'; // Close image container
-
-        // Add category-specific details
-        if (item.category === 'watches') {
-          html += `<p><strong>Serial #:</strong> ${item.serial_number || 'N/A'}</p>`;
-          html += `<p><strong>Case Color:</strong> ${item.case_color || 'N/A'}</p>`;
-          html += `<p><strong>Dial Color:</strong> ${item.dial_color || 'N/A'}</p>`;
-        } else if (item.category === 'pokemon') {
-          html += `<p><strong>Rarity:</strong> ${item.rarity || 'N/A'}</p>`;
-          html += `<p><strong>Set #:</strong> ${item.set_number || 'N/A'}</p>`;
-        }
-
-        // Add owner info
-        html += `<p><strong>Owner:</strong> ${item.owner_username || 'N/A'}</p>`;
-        // Add contract info (optional, but useful)
-        if (item.contract_address && item.token_id) {
-             html += `<p><strong>Contract:</strong> ${item.contract_address} <br><strong>Token ID:</strong> ${item.token_id}</p>`;
-             // You could add links to a block explorer here
-        }
-
-
-        infoDiv.innerHTML = html; // Update the page content
-
-      } catch (error) {
-        console.error("Failed to load item details:", error);
-        infoDiv.innerHTML = `<p class="error-message">Error loading item details: ${error.message}</p>`;
-      }
-    }
-    show();
-  </script>
+  <div class="container" id="action-area" style="display: none;"></div>
+  <div class="container" id="offer-status"></div> 
+  <script src="item.js"></script>
 </body>
 </html>
