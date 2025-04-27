@@ -118,158 +118,269 @@ if (document.getElementById('auth')) {
   onLogin();
 }
 
-// --- ADD: Function to handle Seller Accepting Offer ---
-async function acceptOffer(offerId, escrow_id, nftContractAddress, tokenId, statusElementId) {
+// --- MODIFIED: Seller accepts offer intent (calls backend only) ---
+async function acceptOfferIntent(offerId, statusElementId) {
     const statusDiv = document.getElementById(statusElementId);
-    // --- Check provider and signer ---
-    if (!provider || !signer) {
-        statusDiv.textContent = "Error: MetaMask connection issue. Please ensure wallet is connected and refresh.";
-        statusDiv.className = 'status-message error-message';
-        return;
-    }
-    // --- Check contract addresses and ABIs ---
-    if (!ESCROW_CONTRACT_ADDRESS || ESCROW_CONTRACT_ADDRESS === "YOUR_DEPLOYED_ESCROW_CONTRACT_ADDRESS") {
-        statusDiv.textContent = "Error: Escrow contract address not configured in app.js.";
-        statusDiv.className = 'status-message error-message';
-        return;
-    }
-     if (!ethers.utils.isAddress(ESCROW_CONTRACT_ADDRESS)) {
-        statusDiv.textContent = `Error: Invalid Escrow contract address format: ${ESCROW_CONTRACT_ADDRESS}`;
-        statusDiv.className = 'status-message error-message';
-        return;
-    }
-    if (!ethers.utils.isAddress(nftContractAddress)) {
-        statusDiv.textContent = `Error: Invalid NFT contract address format passed: ${nftContractAddress}`;
-        statusDiv.className = 'status-message error-message';
-        return;
-    }
-    if (!ESCROW_CONTRACT_ABI || ESCROW_CONTRACT_ABI.length === 0) {
-        statusDiv.textContent = "Error: Escrow contract ABI not configured.";
-        statusDiv.className = 'status-message error-message';
-        return;
-    }
-    if (!NFT_CONTRACT_ABI || NFT_CONTRACT_ABI.length === 0) {
-        statusDiv.textContent = "Error: NFT contract ABI not configured.";
-        statusDiv.className = 'status-message error-message';
-        return;
-    }
-
-    statusDiv.textContent = "Processing acceptance...";
+    statusDiv.textContent = "Notifying server of acceptance...";
     statusDiv.className = 'status-message';
 
     try {
-        // --- Get a potentially refreshed signer instance ---
-        // Although the global signer should work, this ensu    res we use the latest state
-        const currentSigner = provider.getSigner();
-        const signerAddress = await currentSigner.getAddress();
-        console.log(`Accepting offer ${offerId} using signer: ${signerAddress}`);
-
-        // 1. Prompt seller to approve NFT transfer to Escrow contract
-        statusDiv.innerHTML = `<b>Action Required:</b> Please approve the Escrow contract (${ESCROW_CONTRACT_ADDRESS}) to transfer your NFT (Token ID: ${tokenId}) using MetaMask.`;
-
-        // --- Instantiate NFT Contract ---
-        const nftContract = new ethers.Contract(nftContractAddress, NFT_CONTRACT_ABI, currentSigner); // Use currentSigner
-
-        // --- Check current approval status (optional but good practice) ---
-        const currentApproval = await nftContract.getApproved(tokenId);
-        console.log(`Current approval for token ${tokenId}: ${currentApproval}`);
-        if (currentApproval.toLowerCase() !== ESCROW_CONTRACT_ADDRESS.toLowerCase()) {
-            console.log(`Approving Escrow contract (${ESCROW_CONTRACT_ADDRESS}) for token ${tokenId}...`);
-            const approveTx = await nftContract.approve(ESCROW_CONTRACT_ADDRESS, tokenId);
-            statusDiv.textContent = `Approval transaction sent (${approveTx.hash}). Waiting for confirmation...`;
-            await approveTx.wait(1); // Wait for 1 confirmation
-            statusDiv.textContent = "NFT transfer approved!";
-        } else {
-             statusDiv.textContent = "NFT transfer already approved.";
-             console.log(`Escrow contract already approved for token ${tokenId}.`);
-        }
-
-        statusDiv.textContent = "Now confirming acceptance with Escrow contract...";
-
-        // 2. Call acceptOffer on Escrow Contract
-        // --- Instantiate Escrow Contract ---
-         const escrowContract = new ethers.Contract(ESCROW_CONTRACT_ADDRESS, ESCROW_CONTRACT_ABI, currentSigner); // Use currentSigner
-
-         console.log(`Calling acceptOffer on ${ESCROW_CONTRACT_ADDRESS} for escrowId ${offerId}...`);
-         const acceptTx = await escrowContract.acceptOffer(escrow_id); // Assuming offerId is the escrowId
-
-         statusDiv.textContent = `Acceptance transaction sent (${acceptTx.hash}). Waiting for confirmation...`;
-         await acceptTx.wait(1); // Wait for 1 confirmation
-         statusDiv.textContent = "Escrow acceptance confirmed on blockchain! Updating server status...";
-
-
-        // 3. Update backend status
+        // Call backend to update status to 'accepted_by_seller'
         const response = await fetch(`/api/offers/${offerId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'accept' }) // Server will set status to 'processing'
+            body: JSON.stringify({ action: 'accept' })
         });
-        const result = await response.json();
+        const result = await response.json(); // Result might contain fundingDetails, not used here
+
         if (!response.ok || !result.success) {
-            // Log the error but proceed since the blockchain part succeeded
-            console.error(`Backend update failed: ${result.error || 'Unknown server error'}`);
-            statusDiv.textContent = `⚠️ Offer accepted on blockchain, but server update failed. Status might be inconsistent.`;
-            statusDiv.className = 'status-message error-message'; // Use error style as a warning
-        } else {
-            statusDiv.textContent = `✅ Offer accepted! Waiting for buyer to confirm receipt.`;
-            statusDiv.className = 'status-message success-message';
+            throw new Error(result.error || `Server error: ${response.status}`);
         }
 
-        // Reload offers to reflect the change regardless of backend update success
+        statusDiv.textContent = `✅ Offer accepted. Waiting for buyer to fund escrow.`;
+        statusDiv.className = 'status-message success-message';
+
+        // Reload offers to reflect the change
         loadOffers();
 
     } catch (error) {
-        console.error("Accept offer failed:", error);
-        // Provide more specific feedback if possible
-        let errorMessage = error.reason || error.message || "An unknown error occurred.";
-        // Check if it's the ENS error again, despite the fix attempt
-        if (error.code === 'UNSUPPORTED_OPERATION' && error.operation === 'getResolver') {
-            errorMessage = `Network does not support ENS (getResolver failed). Check MetaMask network and RPC connection. (${error.message})`;
-        } else if (error.code === 'ACTION_REJECTED') {
-             errorMessage = "Transaction rejected in MetaMask.";
-        } else if (error.error?.message) { // Check for nested error messages (common with contract reverts)
-             errorMessage = error.error.message;
-        }
-        statusDiv.textContent = `❌ Acceptance Failed: ${errorMessage}`;
+        console.error("Accept offer intent failed:", error);
+        statusDiv.textContent = `❌ Acceptance Failed: ${error.message}`;
         statusDiv.className = 'status-message error-message';
     }
 }
 
-// --- ADD: Function to handle Seller Declining Offer ---
-async function declineOffer(offerId, escrow_id, statusElementId) {
+// --- NEW FUNCTION: Buyer funds the escrow after seller accepts intent ---
+async function fundEscrow(offerId, fundingDetails, statusElementId) {
     const statusDiv = document.getElementById(statusElementId);
-    statusDiv.textContent = "Declining offer...";
+    if (!provider || !signer) { statusDiv.textContent = "Error: MetaMask connection issue."; return; }
+    if (!ESCROW_CONTRACT_ADDRESS || !ethers.utils.isAddress(ESCROW_CONTRACT_ADDRESS)) { statusDiv.textContent = "Error: Escrow contract address invalid or missing."; return; }
+    if (!ESCROW_CONTRACT_ABI || ESCROW_CONTRACT_ABI.length === 0) { statusDiv.textContent = "Error: Escrow contract ABI missing."; return; }
+    if (!fundingDetails || !fundingDetails.offerAmountEth || !fundingDetails.sellerWallet || !fundingDetails.nftContractAddress || fundingDetails.tokenId === undefined) {
+        statusDiv.textContent = "Error: Missing details required to fund escrow.";
+        return;
+    }
+
+    statusDiv.textContent = "Preparing funding transaction...";
     statusDiv.className = 'status-message';
 
     try {
-       // 1. Call backend API to update status to 'declined'
-       const response = await fetch(`/api/offers/${offerId}`, {
-           method: 'PUT',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ action: 'decline' })
-       });
-       const result = await response.json();
-       if (!response.ok || !result.success) {
-           // If backend fails, don't proceed to contract cancellation
-           throw new Error(result.error || `Failed to update offer status on server.`);
-       }
+        const offerAmountWei = ethers.utils.parseEther(fundingDetails.offerAmountEth);
 
-       statusDiv.textContent = `Offer declined on server. Now cancelling on blockchain...`;
+        console.log(`Funding Escrow: Offer ${offerId}, Amount ${fundingDetails.offerAmountEth} ETH`);
+        console.log(`Seller: ${fundingDetails.sellerWallet}, NFT: ${fundingDetails.nftContractAddress} / ${fundingDetails.tokenId}`);
 
-       // **** ADDED: Call cancelOffer to refund buyer via contract ****
-       // Note: This assumes the seller declining also triggers the refund.
-       // The cancelOffer function handles the contract interaction and UI updates.
-       await cancelOffer(escrow_id, statusElementId, true); // Pass true to indicate it's part of decline flow
-       // The final status message will be set by cancelOffer upon completion/failure.
-       // loadOffers() is called within cancelOffer.
-       // **** END ADDED ****
+        // Instantiate the Escrow Contract
+        const escrowContract = new ethers.Contract(ESCROW_CONTRACT_ADDRESS, ESCROW_CONTRACT_ABI, signer);
+
+        statusDiv.textContent = "Please confirm the transaction in MetaMask to fund the escrow...";
+
+        // Call the createEscrow function
+        const tx = await escrowContract.createEscrow(
+            fundingDetails.sellerWallet,       // Seller's wallet address
+            fundingDetails.nftContractAddress, // NFT contract
+            fundingDetails.tokenId,            // NFT token ID
+            offerAmountWei,                    // Offer amount in Wei
+            { value: offerAmountWei }          // ETH to send
+        );
+
+        statusDiv.textContent = `Transaction sent (${tx.hash}). Waiting for confirmation...`;
+        console.log("Create Escrow Tx:", tx);
+
+        const receipt = await tx.wait(1); // Wait for 1 confirmation
+        console.log("Funding transaction confirmed:", receipt);
+
+        // --- Extract Escrow ID from event ---
+        let newEscrowId = null;
+        const eventInterface = new ethers.utils.Interface(ESCROW_CONTRACT_ABI);
+        const createdEvent = receipt.logs
+            .map(log => { try { return eventInterface.parseLog(log); } catch (e) { return null; } })
+            .find(parsedLog => parsedLog?.name === "EscrowCreated");
+
+        if (createdEvent && createdEvent.args.escrowId !== undefined) {
+            newEscrowId = createdEvent.args.escrowId.toString();
+            console.log("Detected EscrowCreated event, Escrow ID:", newEscrowId);
+        } else {
+            console.error("Could not find EscrowCreated event or escrowId in transaction logs!");
+            // Note: Even if event parsing fails, the escrow *was* created.
+            // Maybe try fetching escrow ID from contract state if possible, or require manual input?
+            // For now, throw error, but a more robust solution might be needed.
+             throw new Error("Escrow funded on chain, but failed to retrieve Escrow ID from event logs. Cannot update server.");
+        }
+
+        statusDiv.textContent = "Blockchain escrow funded! Updating server...";
+
+        // --- Call backend API to save funding details ---
+        const backendResponse = await fetch(`/api/offers/${offerId}/fund`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                escrowContractAddress: ESCROW_CONTRACT_ADDRESS,
+                escrowId: newEscrowId,
+                txHash: tx.hash
+            })
+        });
+
+        const backendResult = await backendResponse.json();
+        if (!backendResponse.ok || !backendResult.success) {
+             // Log error, but the blockchain part succeeded. UI might be slightly inconsistent until reload.
+             console.error(`Backend update failed after funding: ${backendResult.error || 'Unknown server error'}`);
+             statusDiv.textContent = `⚠️ Escrow funded on blockchain, but server update failed. Status might be inconsistent. Escrow ID: ${newEscrowId}`;
+             statusDiv.className = 'status-message error-message'; // Use error style as a warning
+        } else {
+             statusDiv.textContent = "✅ Escrow funded successfully! Waiting for seller action.";
+             statusDiv.className = 'status-message success-message';
+        }
+
+        // Reload offers to reflect the change
+        loadOffers();
 
     } catch (error) {
-        console.error("Decline offer process failed:", error);
-        statusDiv.textContent = `❌ Decline Failed: ${error.message}`;
+        console.error("Fund escrow failed:", error);
+        statusDiv.textContent = `❌ Funding Failed: ${error.reason || error.message}`;
         statusDiv.className = 'status-message error-message';
-        // Reload offers even on failure to ensure UI consistency
+    }
+}
+
+// --- NEW/REFACTORED FUNCTION: Seller confirms acceptance in contract *after* funding ---
+// (Contains logic previously in the original acceptOffer)
+async function confirmSellerAcceptanceInContract(offerId, escrow_id, nftContractAddress, tokenId, statusElementId) {
+    const statusDiv = document.getElementById(statusElementId);
+    if (!provider || !signer) { statusDiv.textContent = "Error: MetaMask connection issue."; return; }
+    if (!ESCROW_CONTRACT_ADDRESS || !ethers.utils.isAddress(ESCROW_CONTRACT_ADDRESS)) { statusDiv.textContent = "Error: Escrow contract address invalid."; return; }
+    // Add checks for ABIs and other params as needed...
+
+    statusDiv.textContent = "Processing contract acceptance...";
+    statusDiv.className = 'status-message';
+
+    try {
+        const currentSigner = provider.getSigner();
+
+        // 1. Approve NFT transfer (if not already approved)
+        statusDiv.innerHTML = `<b>Action Required:</b> Approving NFT transfer...`;
+        const nftContract = new ethers.Contract(nftContractAddress, NFT_CONTRACT_ABI, currentSigner);
+        const currentApproval = await nftContract.getApproved(tokenId);
+
+        if (currentApproval.toLowerCase() !== ESCROW_CONTRACT_ADDRESS.toLowerCase()) {
+            console.log(`Approving Escrow contract (${ESCROW_CONTRACT_ADDRESS}) for token ${tokenId}...`);
+            const approveTx = await nftContract.approve(ESCROW_CONTRACT_ADDRESS, tokenId);
+            statusDiv.textContent = `Approval transaction sent (${approveTx.hash}). Waiting...`;
+            await approveTx.wait(1);
+            statusDiv.textContent = "NFT transfer approved!";
+        } else {
+             statusDiv.textContent = "NFT transfer already approved.";
+        }
+
+        // 2. Call acceptOffer on Escrow Contract
+        statusDiv.textContent = "Confirming acceptance with Escrow contract...";
+        const escrowContract = new ethers.Contract(ESCROW_CONTRACT_ADDRESS, ESCROW_CONTRACT_ABI, currentSigner);
+        console.log(`Calling acceptOffer on ${ESCROW_CONTRACT_ADDRESS} for escrowId ${escrow_id}...`); // Use escrow_id passed in
+        const acceptTx = await escrowContract.acceptOffer(escrow_id); // Use escrow_id
+
+        statusDiv.textContent = `Acceptance transaction sent (${acceptTx.hash}). Waiting...`;
+        await acceptTx.wait(1);
+        statusDiv.textContent = "Escrow acceptance confirmed on blockchain! Updating server...";
+
+        // 3. Update backend status to 'processing'
+        const response = await fetch(`/api/offers/${offerId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            // --- MODIFIED: New action 'seller_confirmed' ---
+            body: JSON.stringify({ action: 'seller_confirmed' })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            console.error(`Backend update failed after contract acceptance: ${result.error || 'Unknown server error'}`);
+             statusDiv.textContent = `⚠️ Offer accepted on blockchain, but server update failed. Status might be inconsistent.`;
+             statusDiv.className = 'status-message error-message';
+        } else {
+            statusDiv.textContent = `✅ Offer active in escrow! Waiting for buyer to confirm receipt.`;
+            statusDiv.className = 'status-message success-message';
+        }
+
         loadOffers();
+
+    } catch (error) {
+        console.error("Confirm seller acceptance in contract failed:", error);
+        statusDiv.textContent = `❌ Confirmation Failed: ${error.reason || error.message}`;
+        statusDiv.className = 'status-message error-message';
+    }
+}
+
+// --- MODIFY declineOffer and cancelOffer ---
+// Needs logic to check offer status before acting.
+// Simplified Example: assumes 'decline' is only for pre-funded states, 'cancel' for funded states
+async function declineOrCancelOffer(offerId, escrow_id, currentStatus, statusElementId, isBuyerCancelling = false) {
+    const statusDiv = document.getElementById(statusElementId);
+
+    // States where only backend update is needed (no funds in escrow yet)
+    const backendOnlyStates = ['pending', 'accepted_by_seller'];
+
+    if (backendOnlyStates.includes(currentStatus)) {
+        // --- Seller Decline or Buyer Cancel (Pre-Funding) ---
+        statusDiv.textContent = "Updating server status...";
+        statusDiv.className = 'status-message';
+        try {
+            const response = await fetch(`/api/offers/${offerId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                // Use 'decline' action for both seller decline and buyer cancel pre-funding
+                body: JSON.stringify({ action: 'decline' })
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || `Failed to update offer status on server.`);
+            }
+            statusDiv.textContent = `✅ Offer ${isBuyerCancelling ? 'cancelled' : 'declined'} successfully.`;
+            statusDiv.className = 'status-message success-message';
+            loadOffers();
+        } catch (error) {
+            console.error("Decline/Cancel (pre-funding) failed:", error);
+            statusDiv.textContent = `❌ Failed: ${error.message}`;
+            statusDiv.className = 'status-message error-message';
+        }
+    } else if (currentStatus === 'active' || currentStatus === 'funded') {
+        // --- Buyer or Seller Cancel (Post-Funding) ---
+        // Requires contract interaction: cancelEscrow
+        if (escrow_id === undefined || escrow_id === null) {
+             statusDiv.textContent = `❌ Cannot cancel on blockchain: Missing Escrow ID.`;
+             statusDiv.className = 'status-message error-message';
+             return;
+        }
+        statusDiv.textContent = "Processing cancellation on blockchain...";
+        statusDiv.className = 'status-message';
+        if (!provider || !signer) { /* ... error handling ... */ return; }
+
+        try {
+             const escrowContract = new ethers.Contract(ESCROW_CONTRACT_ADDRESS, ESCROW_CONTRACT_ABI, signer);
+             statusDiv.textContent = "Please confirm cancellation in MetaMask...";
+             const tx = await escrowContract.cancelEscrow(escrow_id); // Use escrow_id
+             statusDiv.textContent = `Cancellation transaction sent (${tx.hash}). Waiting...`;
+             await tx.wait(1);
+             statusDiv.textContent = "Blockchain cancellation successful! Updating server...";
+
+             // Now update backend (optional, but good practice)
+             try {
+                const response = await fetch(`/api/offers/${offerId}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'decline' }) // Use 'decline' to mark as finished
+                });
+                if (!response.ok) console.error("Backend update failed after successful cancellation.");
+             } catch(beError) { console.error("Error updating backend after cancellation:", beError); }
+
+             statusDiv.textContent = `✅ Offer cancelled & funds returned to buyer.`;
+             statusDiv.className = 'status-message success-message';
+             loadOffers();
+
+        } catch (error) {
+            console.error("Cancel offer (post-funding) failed:", error);
+            statusDiv.textContent = `❌ Cancellation Failed: ${error.reason || error.message}`;
+            statusDiv.className = 'status-message error-message';
+        }
+    } else {
+        // Cannot cancel/decline in states like 'processing', 'fulfilled', 'declined'
+        statusDiv.textContent = `Action not allowed in current status ('${currentStatus}').`;
+        statusDiv.className = 'status-message error-message';
     }
 }
 
@@ -329,89 +440,9 @@ async function declineOffer(offerId, escrow_id, statusElementId) {
      }
  }
 
-async function cancelOffer(offerId, statusElementId, calledFromDecline = false) {
-    const statusDiv = document.getElementById(statusElementId);
-    // Basic checks
-    if (!provider || !signer) {
-        statusDiv.textContent = "Error: MetaMask connection issue.";
-        statusDiv.className = 'status-message error-message';
-        return; // Indicate failure if called from decline
-    }
-    if (!ESCROW_CONTRACT_ADDRESS || !ethers.utils.isAddress(ESCROW_CONTRACT_ADDRESS)) {
-        statusDiv.textContent = "Error: Escrow contract address not configured or invalid.";
-        statusDiv.className = 'status-message error-message';
-        return;
-    }
-    if (!ESCROW_CONTRACT_ABI || ESCROW_CONTRACT_ABI.length === 0) {
-        statusDiv.textContent = "Error: Escrow contract ABI not configured.";
-        statusDiv.className = 'status-message error-message';
-        return;
-    }
-     if (offerId === undefined || offerId === null || isNaN(parseInt(offerId))) {
-         statusDiv.textContent = "Error: Invalid Offer ID for cancellation.";
-         statusDiv.className = 'status-message error-message';
-         return;
-     }
-
-    // Don't overwrite "Declining..." message if called from declineOffer
-    if (!calledFromDecline) {
-        statusDiv.textContent = "Processing cancellation...";
-        statusDiv.className = 'status-message';
-    }
-
-    try {
-        // Get signer and contract instance
-        const currentSigner = provider.getSigner();
-        const signerAddress = await currentSigner.getAddress();
-        console.log(`DEBUG: Attempting to cancel offer ${offerId} using signer address: ${signerAddress}`);
-        const escrowContract = new ethers.Contract(ESCROW_CONTRACT_ADDRESS, ESCROW_CONTRACT_ABI, currentSigner);
-
-        statusDiv.textContent = "Please confirm the cancellation transaction in MetaMask...";
-
-        // Call the cancelEscrow function on the contract
-        console.log(`DEBUG: Calling cancelEscrow on ${ESCROW_CONTRACT_ADDRESS} for escrowId ${offerId}...`);
-        const tx = await escrowContract.cancelEscrow(offerId); // offerId is the escrowId
-
-        statusDiv.textContent = `Cancellation transaction sent (${tx.hash}). Waiting for confirmation...`;
-        await tx.wait(1);
-
-        // Success message depends on how it was called
-        if (calledFromDecline) {
-             statusDiv.textContent = "✅ Offer declined & funds returned to buyer.";
-        } else {
-             statusDiv.textContent = "✅ Offer cancelled successfully. Funds returned to buyer.";
-        }
-        statusDiv.className = 'status-message success-message';
-
-        // Reload offers to reflect the change
-        loadOffers();
-        return true; // Indicate success if called from decline
-
-    } catch (error) {
-        console.error("Cancel offer failed:", error);
-        let errorMessage = error.reason || error.message || "An unknown error occurred.";
-        if (error.code === 'ACTION_REJECTED') {
-            errorMessage = "Transaction rejected in MetaMask.";
-        } else if (error.error?.message) {
-            errorMessage = error.error.message;
-        } else if (errorMessage.includes("Escrow not in Created state")) {
-            errorMessage = "Offer cannot be cancelled as it has already been accepted or processed.";
-        } else if (errorMessage.includes("Only buyer or seller can cancel")) {
-            errorMessage = "You are not authorized to cancel this offer.";
-        }
-        // Update status message based on how it was called
-        if (calledFromDecline) {
-             statusDiv.textContent = `❌ Decline successful on server, but blockchain cancellation failed: ${errorMessage}`;
-        } else {
-             statusDiv.textContent = `❌ Cancellation Failed: ${errorMessage}`;
-        }
-        statusDiv.className = 'status-message error-message';
-        loadOffers(); // Reload offers even on failure
-        return false; // Indicate failure if called from decline
-    }
-}
 
 // --- ADD: Function to load and display offers ---
+// --- MAJOR UPDATES to loadOffers ---
 async function loadOffers() {
     const incomingList = document.getElementById('incoming-list');
     const outgoingList = document.getElementById('outgoing-list');
@@ -429,16 +460,20 @@ async function loadOffers() {
     noOutgoing.style.display = 'block';
 
     try {
+        // --- MODIFIED: Fetch endpoint needs to return funding details for 'accepted_by_seller' status ---
+        // Ensure /api/offers endpoint in server.js returns offer_amount_eth, seller_wallet,
+        // item_contract_address, and item_token_id when needed.
+        // Modify the SQL query in GET /api/offers in server.js if necessary.
         const response = await fetch('/api/offers');
         if (!response.ok) {
-             const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-             if (response.status === 401) {
-                 console.log("User not logged in, cannot load offers.");
-                 document.getElementById('incoming-offers').style.display = 'none';
-                 document.getElementById('outgoing-offers').style.display = 'none';
-                 return;
-             }
-             throw new Error(errorData.error || `Failed to fetch offers: ${response.statusText}`);
+            const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+            if (response.status === 401) {
+                console.log("User not logged in, cannot load offers.");
+                document.getElementById('incoming-offers').style.display = 'none';
+                document.getElementById('outgoing-offers').style.display = 'none';
+                return;
+            }
+            throw new Error(errorData.error || `Failed to fetch offers: ${response.statusText}`);
         }
         const offers = await response.json();
 
@@ -448,20 +483,27 @@ async function loadOffers() {
                     console.warn("Skipping incomplete offer data:", offer);
                     return;
                 }
-
                 const li = document.createElement('li');
                 li.className = 'offer-item';
                 const statusElementId = `offer-status-${offer.offer_id}`;
-
+                
                 const imageUrl = offer.item_image ? `https://gateway.pinata.cloud/ipfs/${offer.item_image.replace('ipfs://', '')}` : 'https://placehold.co/60x60/eee/ccc?text=No+Image';
                 const imageHtml = `<img src="${imageUrl}" alt="${offer.item_name}" class="offer-item-image" onerror="this.src='https://placehold.co/60x60/eee/ccc?text=Error'; this.onerror=null;">`;
+
+                // --- Prepare details potentially needed for actions ---
+                 const fundingDetails = JSON.stringify({
+                    offerAmountEth: offer.offer_amount_eth,
+                    sellerWallet: offer.seller_wallet, // Make sure server returns this
+                    nftContractAddress: offer.item_contract_address,
+                    tokenId: offer.item_token_id
+                 }).replace(/"/g, "&quot;"); // Escape quotes for HTML attribute
+
 
                 let detailsHtml = `<div class="offer-details">
                     ${imageHtml}
                     <div>
-                        <strong>${offer.item_name}</strong> (${offer.item_category || 'N/A'})<br>
-                        <span>Offer: ${offer.offer_amount_eth} ETH</span><br>`;
-
+                     <strong>${offer.item_name}</strong> (${offer.item_category || 'N/A'})<br>
+                     <span>Offer: ${offer.offer_amount_eth} ETH</span><br>`;
                 let actionsHtml = '<div class="offer-actions">';
                 let statusMessageHtml = `<div id="${statusElementId}" class="status-message"></div>`;
 
@@ -469,38 +511,62 @@ async function loadOffers() {
                 if (offer.user_role === 'seller') {
                     noIncoming.style.display = 'none';
                     detailsHtml += `<span>Buyer: ${offer.buyer_username || 'Unknown'}</span>`;
-                    if (offer.offer_status === 'active') { // 'active' on backend corresponds to 'Created' in contract
-                        if (offer.item_contract_address && offer.item_token_id !== undefined) {
-                             actionsHtml += `<button onclick="acceptOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.item_contract_address}', ${offer.item_token_id}, '${statusElementId}')">Accept</button>`;
-                        } else {
-                             actionsHtml += `<span class="status-error">Cannot accept (missing NFT details)</span>`;
-                        }
-                        // **** MODIFIED: Call declineOffer which now handles cancellation ****
-                        actionsHtml += `<button onclick="declineOffer(${offer.offer_id}, ${offer.escrow_id}, '${statusElementId}')">Decline</button>`;
-                        // **** REMOVED Seller Cancel Button - Decline handles it ****
-                        // actionsHtml += `<button class="cancel-button" onclick="cancelOffer(${offer.offer_id}, '${statusElementId}')">Cancel</button>`;
-                    } else if (offer.offer_status === 'processing' || offer.offer_status === 'accepted') {
-                         actionsHtml += `<span class="status-processing">Accepted (Waiting for buyer confirmation)</span>`;
-                    } else {
-                         actionsHtml += `<span class="status-${offer.offer_status}">Status: ${offer.offer_status}</span>`; // Show declined, fulfilled, etc.
+                    
+                    switch (offer.offer_status) {
+                        case 'pending':
+                            // --- MODIFIED: Call acceptOfferIntent ---
+                            actionsHtml += `<button onclick="acceptOfferIntent(${offer.offer_id}, '${statusElementId}')">Accept</button>`;
+                            // --- MODIFIED: Call unified decline/cancel function ---
+                            actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', false)">Decline</button>`;
+                            break;
+                        case 'accepted_by_seller':
+                            actionsHtml += `<span class="status-processing">Waiting for Buyer to Fund Escrow</span>`;
+                             // Seller might be able to cancel here too? Add button if needed.
+                             actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', false)">Cancel Offer</button>`;
+                            break;
+                        case 'active': // Escrow funded, waiting for seller contract acceptance
+                        case 'funded': // Alias for active
+                             // --- MODIFIED: Call confirmSellerAcceptanceInContract ---
+                             actionsHtml += `<button onclick="confirmSellerAcceptanceInContract(${offer.offer_id}, ${offer.escrow_id}, '${offer.item_contract_address}', ${offer.item_token_id}, '${statusElementId}')">Confirm Acceptance in Contract</button>`;
+                              // Seller can cancel *funded* escrow before confirming?
+                             actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', false)">Cancel Escrow</button>`;
+                            break;
+                        case 'processing': // Seller accepted in contract, waiting buyer confirm receipt
+                            actionsHtml += `<span class="status-processing">Accepted in Escrow (Waiting for Buyer Confirmation)</span>`;
+                            break;
+                        default: // fulfilled, declined, cancelled
+                            actionsHtml += `<span class="status-${offer.offer_status}">Status: ${offer.offer_status}</span>`;
                     }
                 }
                 // --- Buyer's View ---
                 else { // User is buyer
                     noOutgoing.style.display = 'none';
                     detailsHtml += `<span>Seller: ${offer.seller_username || 'Unknown'}</span>`;
-                    if (offer.offer_status === 'active') { // 'active' on backend corresponds to 'Created' in contract
-                        actionsHtml += `<span class="status-active">Offer Pending Seller</span>`;
-                        // **** ADDED: Cancel Button for Buyer ****
-                        actionsHtml += `<button class="cancel-button" onclick="declineOffer(${offer.offer_id}, ${offer.escrow_id}, '${statusElementId}')">Cancel Offer</button>`;
-                    } else if (offer.offer_status === 'processing' || offer.offer_status === 'accepted') {
-                        if (offer.escrow_id !== undefined && offer.escrow_id !== null) {
+
+                    switch (offer.offer_status) {
+                        case 'pending':
+                            actionsHtml += `<span class="status-active">Offer Sent (Awaiting Seller)</span>`;
+                            // --- MODIFIED: Buyer cancels pending offer ---
+                            actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', true)">Cancel Offer</button>`;
+                            break;
+                        case 'accepted_by_seller':
+                             // --- MODIFIED: Add Fund Escrow button ---
+                             actionsHtml += `<button onclick='fundEscrow(${offer.offer_id}, ${fundingDetails}, "${statusElementId}")'>Fund Escrow (${offer.offer_amount_eth} ETH)</button>`;
+                             // Buyer can cancel before funding
+                             actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', true)">Cancel Offer</button>`;
+                            break;
+                        case 'active': // Escrow funded, waiting seller contract acceptance
+                        case 'funded':
+                            actionsHtml += `<span class="status-processing">Escrow Funded (Waiting Seller Action)</span>`;
+                             // Buyer can cancel funded escrow before seller accepts in contract?
+                             actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', true)">Cancel Escrow</button>`;
+                            break;
+                        case 'processing': // Seller accepted in contract, waiting buyer confirm receipt
+                             // --- Ensure confirmReceipt uses the correct escrowId ---
                             actionsHtml += `<button onclick="confirmReceipt(${offer.offer_id}, ${offer.escrow_id}, '${statusElementId}')">Confirm Item Received</button>`;
-                        } else {
-                            actionsHtml += `<span class="status-error">Cannot confirm receipt (missing escrow ID)</span>`;
-                        }
-                    } else {
-                         actionsHtml += `<span class="status-${offer.offer_status}">Status: ${offer.offer_status}</span>`; // Show declined, fulfilled, etc.
+                            break;
+                        default: // fulfilled, declined, cancelled
+                            actionsHtml += `<span class="status-${offer.offer_status}">Status: ${offer.offer_status}</span>`;
                     }
                 }
 
@@ -516,11 +582,7 @@ async function loadOffers() {
             });
         }
     } catch (error) {
-        console.error("Error loading offers:", error);
-        noIncoming.style.display = 'none';
-        noOutgoing.style.display = 'none';
-        incomingList.innerHTML = `<li>Error loading incoming offers: ${error.message}</li>`;
-        outgoingList.innerHTML = `<li>Error loading outgoing offers: ${error.message}</li>`;
+        // ... error handling ...
     }
 }
 

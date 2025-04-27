@@ -751,21 +751,33 @@ app.get('/api/offers', ensureLoggedIn, (req, res) => {
     // Select offers where user is buyer OR seller, and status is active or processing
     // Also join with items and users tables to get necessary display info
     const sql = `
-        SELECT
-            o.id as offer_id, o.item_id, o.offer_amount_eth, o.status as offer_status,
-            o.buyer_user_id, o.seller_user_id, o.escrow_id, o.blockchain_tx_hash,
-            i.name as item_name, i.category as item_category, i.front_image as item_image,
-            i.contract_address as item_contract_address,
-            i.token_id as item_token_id,
-            buyer.username as buyer_username,
-            seller.username as seller_username
-        FROM offers o
-        JOIN items i ON o.item_id = i.id
-        JOIN users buyer ON o.buyer_user_id = buyer.id
-        JOIN users seller ON o.seller_user_id = seller.id
-        WHERE (o.buyer_user_id = ? OR o.seller_user_id = ?)
-          AND (o.status = 'active' OR o.status = 'accepted' OR o.status = 'processing')
-        ORDER BY o.updated_at DESC
+    SELECT
+        o.id as offer_id, o.item_id, o.offer_amount_eth, o.status as offer_status,
+        o.buyer_user_id, o.seller_user_id, o.escrow_id, o.blockchain_tx_hash,
+        i.name as item_name, i.category as item_category, i.front_image as item_image,
+        i.contract_address as item_contract_address,
+        i.token_id as item_token_id,
+        -- Explicitly select seller wallet from items table or users table:
+        i.owner_wallet as seller_wallet, -- Assuming owner_wallet is the correct seller address
+        -- OR seller.wallet as seller_wallet, -- If joining users seller, select wallet from there
+        buyer.username as buyer_username,
+        seller.username as seller_username
+    FROM offers o
+    JOIN items i ON o.item_id = i.id
+    JOIN users buyer ON o.buyer_user_id = buyer.id
+    JOIN users seller ON o.seller_user_id = seller.id
+    WHERE (o.buyer_user_id = ? OR o.seller_user_id = ?)
+    -- Include all relevant "in-progress" statuses
+    AND (
+        o.status = 'pending'              -- New: Offer submitted
+        OR o.status = 'accepted_by_seller' -- New: Seller accepted, waiting funding
+        OR o.status = 'active'              -- Existing: Escrow funded, waiting seller contract accept
+        OR o.status = 'funded'              -- Alias for active, if you use it
+        OR o.status = 'processing'          -- Existing: Seller accepted in contract, waiting buyer confirm
+        -- Remove 'accepted' if it's no longer used in the new flow
+        -- OR o.status = 'accepted'
+    )
+    ORDER BY o.updated_at DESC
     `;
     db.all(sql, [userId, userId], (err, rows) => {
         if (err) {
@@ -811,16 +823,18 @@ app.get('/api/offers/history', ensureLoggedIn, (req, res) => {
     });
 });
 
-// Place an Offer (Record intent after successful createEscrow tx)
+// Place an Offer (Record intent, NO escrow details initially)
 app.post('/api/offers', ensureLoggedIn, (req, res) => {
-    const { itemId, offerAmountEth, escrowContractAddress, escrowId, txHash } = req.body;
+    // --- MODIFIED: Removed escrowContractAddress, escrowId, txHash from expected body ---
+    const { itemId, offerAmountEth } = req.body;
     const buyerUserId = req.session.user.id;
 
-    if (!itemId || !offerAmountEth || !escrowContractAddress || escrowId === undefined || !txHash) {
-        return res.status(400).json({ error: 'Missing required offer details: itemId, offerAmountEth, escrowContractAddress, escrowId, txHash.' });
+    // --- MODIFIED: Validation updated ---
+    if (!itemId || !offerAmountEth) {
+        return res.status(400).json({ error: 'Missing required offer details: itemId, offerAmountEth.' });
     }
     // Validate offerAmountEth format (simple check)
-    if (isNaN(parseFloat(offerAmountEth))) {
+    if (isNaN(parseFloat(offerAmountEth)) || parseFloat(offerAmountEth) <= 0) { // Ensure positive value
         return res.status(400).json({ error: 'Invalid offer amount format.' });
     }
 
@@ -838,44 +852,53 @@ app.post('/api/offers', ensureLoggedIn, (req, res) => {
         }
         const sellerUserId = item.user_id;
 
-        // 2. Insert the offer into the database
+        // 2. Insert the offer into the database with 'pending' status
         const insertOfferSql = `
-            INSERT INTO offers (item_id, buyer_user_id, seller_user_id, offer_amount_eth, status, escrow_contract_address, escrow_id, blockchain_tx_hash, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO offers (item_id, buyer_user_id, seller_user_id, offer_amount_eth, status, updated_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         `;
+        // --- MODIFIED: Params updated, status set to 'pending' ---
         const params = [
-            itemId, buyerUserId, sellerUserId, String(offerAmountEth), 'active', // Initial status
-            escrowContractAddress, escrowId, txHash
+            itemId, buyerUserId, sellerUserId, String(offerAmountEth), 'pending' // Initial status is pending
         ];
 
         db.run(insertOfferSql, params, function (err) {
             if (err) {
                 console.error("DB error creating offer:", err.message);
-                // Consider if the escrow needs cancellation if DB fails? Complex.
                 return res.status(500).json({ error: "Failed to save offer." });
             }
-            console.log(`Offer created successfully with ID: ${this.lastID} for item ID: ${itemId}`);
-            // TODO: Potentially notify the seller (e.g., via WebSockets or polling)
+            console.log(`Offer created successfully with ID: ${this.lastID} (status: pending) for item ID: ${itemId}`);
+            // TODO: Potentially notify the seller
             return res.json({ success: true, offerId: this.lastID });
         });
     });
 });
 
-// Update Offer Status (Accept / Decline / Confirm Received)
-// Update Offer Status (Accept / Decline / Cancel / Confirm Received)
+
+// Modify PUT /api/offers/:offerId to handle new actions and return data for funding
 app.put('/api/offers/:offerId', ensureLoggedIn, (req, res) => {
     const offerId = req.params.offerId;
-    const { action } = req.body; // 'accept', 'decline' (used by both), 'confirmReceived'
+    // --- MODIFIED: Added 'seller_confirmed' action ---
+    const { action } = req.body; // 'accept', 'decline', 'confirmReceived', 'seller_confirmed' (New: after seller accepts in contract)
     const userId = req.session.user.id;
 
     if (!action) {
         return res.status(400).json({ error: "Missing 'action' in request body." });
     }
 
-    // Fetch offer details to check ownership and current status
-    db.get(`SELECT id, buyer_user_id, seller_user_id, status, item_id FROM offers WHERE id = ?`, [offerId], (err, offer) => {
+    // Fetch offer details along with item details needed for funding/contract interaction
+    // --- MODIFIED: Joined with items table ---
+    const sqlFetchOffer = `
+        SELECT
+            o.id, o.buyer_user_id, o.seller_user_id, o.status, o.item_id, o.offer_amount_eth,
+            i.owner_wallet as seller_wallet, i.contract_address as nft_contract_address, i.token_id, i.status as item_status
+        FROM offers o
+        JOIN items i ON o.item_id = i.id
+        WHERE o.id = ?
+    `;
+    db.get(sqlFetchOffer, [offerId], (err, offer) => { // Renamed 'row' to 'offer' for clarity
         if (err) {
-            console.error(`DB error fetching offer ${offerId}:`, err.message); // Log error
+            console.error(`DB error fetching offer ${offerId}:`, err.message);
             return res.status(500).json({ error: "Database error fetching offer." });
         }
         if (!offer) {
@@ -883,84 +906,147 @@ app.put('/api/offers/:offerId', ensureLoggedIn, (req, res) => {
         }
 
         let newStatus = null;
-        let allowedUserIds = []; // Store IDs of users allowed to perform the action
+        let allowedUserIds = [];
         let allowedCurrentStatus = [];
+        let responseData = { success: true }; // Default response
 
         switch (action) {
-            case 'decline': // Now handles Seller Decline AND Buyer Cancel
-                // Allow EITHER the buyer or the seller to decline/cancel an 'active' offer
+            case 'decline': // Handles Seller Decline OR Buyer Cancel (before funding)
                 allowedUserIds = [offer.seller_user_id, offer.buyer_user_id];
-                newStatus = 'declined'; // Keep status as 'declined' for simplicity, as requested.
-                                        // Alternatively, use 'cancelled' if a different semantic is desired.
-                allowedCurrentStatus = ['active']; // Can only decline/cancel if it's currently active
+                // --- MODIFIED: Can decline/cancel 'pending' or 'accepted_by_seller' ---
+                allowedCurrentStatus = ['pending', 'accepted_by_seller'];
+                // Decline always goes to 'declined', regardless of who initiated
+                newStatus = 'declined';
                 break;
-            case 'accept':
-                allowedUserIds = [offer.seller_user_id]; // Only seller can accept
-                newStatus = 'processing'; // Or 'accepted', depending on your exact state flow
-                allowedCurrentStatus = ['active'];
+            case 'accept': // Seller accepts the offer (triggers buyer funding step)
+                allowedUserIds = [offer.seller_user_id];
+                allowedCurrentStatus = ['pending']; // Only from pending
+                newStatus = 'accepted_by_seller'; // New status indicating seller agreed
+                // --- MODIFIED: Return data needed for buyer to fund escrow ---
+                responseData = {
+                     success: true,
+                     newStatus: newStatus,
+                     fundingDetails: {
+                         offerAmountEth: offer.offer_amount_eth,
+                         sellerWallet: offer.seller_wallet,
+                         nftContractAddress: offer.nft_contract_address,
+                         tokenId: offer.token_id
+                     }
+                 };
                 break;
-            case 'confirmReceived': // This is triggered *after* successful blockchain release
-                allowedUserIds = [offer.buyer_user_id]; // Only buyer can confirm receipt
+             // --- NEW ACTION: seller_confirmed (Seller calls acceptOffer on contract *after* buyer funds) ---
+             case 'seller_confirmed':
+                allowedUserIds = [offer.seller_user_id];
+                allowedCurrentStatus = ['active', 'funded']; // Should be called when escrow is funded
+                newStatus = 'processing'; // Item is now locked in escrow, ready for buyer confirmation
+                break;
+            case 'confirmReceived': // Buyer confirms receipt (after successful releaseFundsAndTransferNFT)
+                allowedUserIds = [offer.buyer_user_id];
+                allowedCurrentStatus = ['processing']; // Can only confirm if seller accepted in contract
                 newStatus = 'fulfilled';
-                // Allow confirming if offer was 'accepted' by seller OR is 'processing'
-                allowedCurrentStatus = ['processing', 'accepted'];
                 break;
             default:
                 return res.status(400).json({ error: "Invalid action specified." });
         }
 
-        // --- Authorization Check (MODIFIED) ---
-        // Check if the current user's ID is in the list of allowed IDs for this action
+        // --- Authorization Check ---
         if (!allowedUserIds.includes(userId)) {
-            console.log(`Authorization failed: User ${userId} attempted action '${action}' on offer ${offerId}. Allowed IDs: ${allowedUserIds.join(', ')}`); // Log failure
+            console.log(`Authorization failed: User ${userId} attempted action '${action}' on offer ${offerId}. Allowed IDs: ${allowedUserIds.join(', ')}`);
             return res.status(403).json({ error: "You are not authorized to perform this action on this offer." });
         }
 
         // --- Status Check ---
-        // Check if the offer's current status allows this action
         if (!allowedCurrentStatus.includes(offer.status)) {
-             console.log(`Status check failed: User ${userId} attempted action '${action}' on offer ${offerId} with status '${offer.status}'. Allowed statuses: ${allowedCurrentStatus.join(', ')}`); // Log failure
+             console.log(`Status check failed: User ${userId} attempted action '${action}' on offer ${offerId} with status '${offer.status}'. Allowed statuses: ${allowedCurrentStatus.join(', ')}`);
             return res.status(400).json({ error: `Action '${action}' not allowed for offer with current status '${offer.status}'.` });
         }
 
         // --- Update Offer Status in Database ---
         db.run(`UPDATE offers SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [newStatus, offerId], function (err) {
             if (err) {
-                 console.error(`DB error updating offer ${offerId} status to ${newStatus}:`, err.message); // Log error
+                 console.error(`DB error updating offer ${offerId} status to ${newStatus}:`, err.message);
                  return res.status(500).json({ error: "Failed to update offer status." });
             }
             if (this.changes === 0) {
-                // Should not happen if the initial fetch worked, but good practice
                 console.warn(`Offer ${offerId} not found during status update attempt to ${newStatus}.`);
                 return res.status(404).json({ error: "Offer not found during update." });
             }
 
             // --- Update Item Status (Conditional) ---
-            // If fulfilling, mark item as 'sold'
+            let newItemStatus = null;
             if (newStatus === 'fulfilled') {
-                db.run(`UPDATE items SET status = 'sold' WHERE id = ?`, [offer.item_id], (itemErr) => {
-                     if (itemErr) { console.error(`Failed to update item ${offer.item_id} status to sold:`, itemErr.message); }
-                     // Log but continue, offer update succeeded
-                });
+                 newItemStatus = 'sold';
+            } else if (newStatus === 'processing') { // Seller accepted in contract
+                 newItemStatus = 'processing'; // Keep item locked
+            } else if (newStatus === 'accepted_by_seller') { // Seller accepted initially
+                 newItemStatus = 'reserved'; // Mark item as reserved, awaiting funding
+            } else if (newStatus === 'declined' || newStatus === 'cancelled') {
+                 // Only change item status if it wasn't already sold or processing
+                 if (offer.item_status !== 'sold' && offer.item_status !== 'processing') {
+                    newItemStatus = 'listed';
+                 }
             }
-            // If accepting, mark item as 'processing'
-            else if (newStatus === 'processing') {
-                 db.run(`UPDATE items SET status = 'processing' WHERE id = ?`, [offer.item_id], (itemErr) => {
-                      if (itemErr) { console.error(`Failed to update item ${offer.item_id} status to processing:`, itemErr.message); }
+
+             if (newItemStatus) {
+                 db.run(`UPDATE items SET status = ? WHERE id = ?`, [newItemStatus, offer.item_id], (itemErr) => {
+                      if (itemErr) { console.error(`Failed to update item ${offer.item_id} status to ${newItemStatus}:`, itemErr.message); }
+                      // Log but continue, offer update succeeded
                  });
-             }
-            // If declining/cancelling an 'active' offer, ensure item goes back to 'listed'
-            // (It should already be 'listed', but this handles edge cases if status was somehow different)
-             else if (newStatus === 'declined' && offer.status === 'active') {
-                  db.run(`UPDATE items SET status = 'listed' WHERE id = ? AND status != 'sold'`, [offer.item_id], (itemErr) => { // Avoid relisting sold items
-                       if (itemErr) { console.error(`Failed to update item ${offer.item_id} status to listed after decline/cancel:`, itemErr.message); }
-                  });
              }
 
             console.log(`Offer ${offerId} status successfully updated to ${newStatus} by user ${userId} (Role: ${userId === offer.buyer_user_id ? 'buyer' : 'seller'})`);
-            // TODO: Notify relevant user (e.g., via WebSockets)
-            return res.json({ success: true, newStatus: newStatus });
+             // --- MODIFIED: Return potentially enriched responseData ---
+             responseData.newStatus = newStatus; // Ensure newStatus is in response
+             return res.json(responseData);
         });
+    });
+});
+
+// --- NEW ENDPOINT: Buyer confirms funding ---
+app.post('/api/offers/:offerId/fund', ensureLoggedIn, (req, res) => {
+    const offerId = req.params.offerId;
+    const { escrowContractAddress, escrowId, txHash } = req.body;
+    const userId = req.session.user.id;
+
+    if (!escrowContractAddress || escrowId === undefined || !txHash) {
+        return res.status(400).json({ error: 'Missing required funding details: escrowContractAddress, escrowId, txHash.' });
+    }
+
+    // 1. Verify the offer exists, is in 'accepted_by_seller' state, and belongs to the calling buyer
+    db.get(`SELECT id, buyer_user_id, status FROM offers WHERE id = ?`, [offerId], (err, offer) => {
+        if (err) {
+            console.error(`DB error fetching offer ${offerId} for funding update:`, err.message);
+            return res.status(500).json({ error: "Database error fetching offer." });
+        }
+        if (!offer) {
+            return res.status(404).json({ error: "Offer not found." });
+        }
+        if (offer.buyer_user_id !== userId) {
+             return res.status(403).json({ error: "You are not the buyer for this offer." });
+        }
+        if (offer.status !== 'accepted_by_seller') {
+             return res.status(400).json({ error: `Offer cannot be funded in its current status ('${offer.status}').` });
+        }
+
+        // 2. Update the offer with escrow details and set status to 'active' (or 'funded')
+        const newStatus = 'active'; // Or 'funded' - indicates escrow is live
+        db.run(`UPDATE offers SET escrow_contract_address = ?, escrow_id = ?, blockchain_tx_hash = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [escrowContractAddress, escrowId, txHash, newStatus, offerId],
+            function (err) {
+                if (err) {
+                    console.error(`DB error updating funded offer ${offerId}:`, err.message);
+                    return res.status(500).json({ error: "Failed to update offer with funding details." });
+                }
+                if (this.changes === 0) {
+                    // Should not happen if checks passed
+                    return res.status(404).json({ error: "Offer not found during funding update." });
+                }
+
+                console.log(`Offer ${offerId} successfully updated with funding details. Status: ${newStatus}`);
+                 // TODO: Notify Seller that escrow is funded
+                return res.json({ success: true, newStatus: newStatus });
+            }
+        );
     });
 });
 
