@@ -1,3 +1,20 @@
+# Demo steps
+
+## prerequisites
+
+1. have npm installed
+2. run 'npm install'
+3. run 'npm start' to start the server and website
+
+Please register a new user (as the seller)
+Please register another user (as the buyer)
+
+## Seller functions
+
+### Mint NFT
+
+Please use the sample items found in folder items/
+
 Supplemental Idea:
 
 use the blockchain as a method to authenticate a user to gain access to data
@@ -12,20 +29,12 @@ An additional idea is to use a blockchain (custom or existing such as ethereum p
 CURRENT PROGRESS //remove for prod:
 
 done
+
 - mint new NFTs
 - post items
 - browse items
 - check transaction history
 - buy / sell items
-
-
-
-
-
-
-
-
-
 
 .ENV:
 
