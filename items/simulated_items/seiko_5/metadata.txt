@@ -1,0 +1,16 @@
+PLEASE ENTER THESE FIELD ON THE MINT TAB
+
+name: 
+Seiko 5
+  
+description:
+A Japanese mechanical watch
+
+Serial Number:
+SK01-0001
+
+Case Color:
+Matte Silver
+
+Dial Color:
+Black

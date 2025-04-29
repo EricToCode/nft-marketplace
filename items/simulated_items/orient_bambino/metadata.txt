@@ -1,0 +1,16 @@
+PLEASE ENTER THESE FIELD ON THE MINT TAB
+
+name: 
+Orient Bambino Open Heart
+  
+description:
+An open heart watch allowing you to view the beating heart
+
+Serial Number:
+ID01-0001
+
+Case Color:
+Metallic Silver
+
+Dial Color:
+Blue

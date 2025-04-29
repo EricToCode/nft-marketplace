@@ -1,0 +1,13 @@
+PLEASE ENTER THESE INTO THE FIELD ON THE MINT TAB
+
+Name:
+Cinderace
+
+Description:
+A fire bunny Pokemon
+
+Rarity:
+Rare 
+
+Set Number:
+034/202

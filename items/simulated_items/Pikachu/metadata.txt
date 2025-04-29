@@ -1,0 +1,13 @@
+PLEASE ENTER THESE INTO THE FIELD ON THE MINT TAB
+
+Name:
+Pikachu
+
+Description:
+An electric mouse Pokemon
+
+Rarity:
+Common 
+
+Set Number:
+56/236
