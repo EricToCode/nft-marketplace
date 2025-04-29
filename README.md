@@ -3,7 +3,6 @@
 ## prerequisites
 
 1. Please create a .env file with the follwing contents:
-
 PINATA_API_KEY=f3230847639260b83f3a
 PINATA_SECRET_API_KEY=bb04c0c9e25ce08b94941667759a0cec1cb4973011909f2b568ae36a10e87b0b
 SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com/ # e.g., from Infura/Alchemy
