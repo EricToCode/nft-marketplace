@@ -42,14 +42,14 @@ button:hover {
 p { color: #333; }
 
 #btnLogout {
-  cursor: pointer; /* Changes the cursor to the hand/pointer icon on hover */
+  cursor: pointer;
 }
 
 .offer-item-image {
-  width: 40px; /* Adjust size as needed */
+  width: 40px; 
   height: 40px;
-  object-fit: cover; /* Keeps aspect ratio while filling space */
-  margin-right: 10px; /* Add some space between image and text */
-  vertical-align: middle; /* Align image nicely with text */
-  border-radius: 4px; /* Optional: rounded corners */
+  object-fit: cover; 
+  margin-right: 10px; 
+  vertical-align: middle; 
+  border-radius: 4px;
 }

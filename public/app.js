@@ -1,5 +1,5 @@
 // Shared frontend logic
-// --- ADD: Escrow Contract Address and ABIs ---
+// --- Escrow Contract Address and ABIs ---
 const ESCROW_CONTRACT_ADDRESS = '0xcF31cCad4Ada195A5DcB9b26D662e6Ae0aD32A1F';
 const ESCROW_CONTRACT_ABI = [ { "inputs": [ { "internalType": "address", "name": "initialOwner", "type": "address" }, { "internalType": "address", "name": "initialMarketplaceFeeAddress", "type": "address" }, { "internalType": "uint256", "name": "initialMarketplaceFeeAmount", "type": "uint256" } ], "stateMutability": "nonpayable", "type": "constructor" }, { "inputs": [ { "internalType": "address", "name": "owner", "type": "address" } ], "name": "OwnableInvalidOwner", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "account", "type": "address" } ], "name": "OwnableUnauthorizedAccount", "type": "error" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "uint256", "name": "escrowId", "type": "uint256" } ], "name": "EscrowAccepted", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "uint256", "name": "escrowId", "type": "uint256" } ], "name": "EscrowCancelled", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "uint256", "name": "escrowId", "type": "uint256" }, { "indexed": true, "internalType": "address", "name": "buyer", "type": "address" }, { "indexed": true, "internalType": "address", "name": "seller", "type": "address" }, { "indexed": false, "internalType": "address", "name": "nftContractAddress", "type": "address" }, { "indexed": false, "internalType": "uint256", "name": "tokenId", "type": "uint256" }, { "indexed": false, "internalType": "uint256", "name": "offerAmount", "type": "uint256" }, { "indexed": false, "internalType": "uint256", "name": "feeAmount", "type": "uint256" } ], "name": "EscrowCreated", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "uint256", "name": "escrowId", "type": "uint256" }, { "indexed": false, "internalType": "address", "name": "buyer", "type": "address" }, { "indexed": false, "internalType": "address", "name": "seller", "type": "address" }, { "indexed": false, "internalType": "uint256", "name": "amountReleasedToSeller", "type": "uint256" }, { "indexed": false, "internalType": "uint256", "name": "feePaid", "type": "uint256" } ], "name": "EscrowReleased", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "address", "name": "previousOwner", "type": "address" }, { "indexed": true, "internalType": "address", "name": "newOwner", "type": "address" } ], "name": "OwnershipTransferred", "type": "event" }, { "inputs": [ { "internalType": "uint256", "name": "_escrowId", "type": "uint256" } ], "name": "acceptOffer", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "_escrowId", "type": "uint256" } ], "name": "cancelEscrow", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address payable", "name": "_seller", "type": "address" }, { "internalType": "address", "name": "_nftContractAddress", "type": "address" }, { "internalType": "uint256", "name": "_tokenId", "type": "uint256" }, { "internalType": "uint256", "name": "_offerAmount", "type": "uint256" } ], "name": "createEscrow", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "payable", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "name": "escrows", "outputs": [ { "internalType": "uint256", "name": "id", "type": "uint256" }, { "internalType": "address payable", "name": "buyer", "type": "address" }, { "internalType": "address payable", "name": "seller", "type": "address" }, { "internalType": "address", "name": "nftContractAddress", "type": "address" }, { "internalType": "uint256", "name": "tokenId", "type": "uint256" }, { "internalType": "uint256", "name": "offerAmount", "type": "uint256" }, { "internalType": "uint256", "name": "totalAmountPaid", "type": "uint256" }, { "internalType": "enum NFTEscrow.EscrowStatus", "name": "status", "type": "uint8" }, { "internalType": "bool", "name": "sellerAccepted", "type": "bool" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "getMarketplaceFeeAddress", "outputs": [ { "internalType": "address", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "getMarketplaceFeeAmount", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "", "type": "address" }, { "internalType": "address", "name": "", "type": "address" }, { "internalType": "uint256", "name": "", "type": "uint256" }, { "internalType": "bytes", "name": "", "type": "bytes" } ], "name": "onERC721Received", "outputs": [ { "internalType": "bytes4", "name": "", "type": "bytes4" } ], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [], "name": "owner", "outputs": [ { "internalType": "address", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "_escrowId", "type": "uint256" } ], "name": "releaseFundsAndTransferNFT", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [], "name": "renounceOwnership", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "newAddress", "type": "address" } ], "name": "setMarketplaceFeeAddress", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "newFeeAmount", "type": "uint256" } ], "name": "setMarketplaceFeeAmount", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "newOwner", "type": "address" } ], "name": "transferOwnership", "outputs": [], "stateMutability": "nonpayable", "type": "function" } ];
 const NFT_CONTRACT_ABI = [ { "inputs": [ { "internalType": "address", "name": "initialOwner", "type": "address" }, { "internalType": "string", "name": "_name", "type": "string" }, { "internalType": "string", "name": "_symbol", "type": "string" } ], "stateMutability": "nonpayable", "type": "constructor" }, { "inputs": [ { "internalType": "address", "name": "sender", "type": "address" }, { "internalType": "uint256", "name": "tokenId", "type": "uint256" }, { "internalType": "address", "name": "owner", "type": "address" } ], "name": "ERC721IncorrectOwner", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "operator", "type": "address" }, { "internalType": "uint256", "name": "tokenId", "type": "uint256" } ], "name": "ERC721InsufficientApproval", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "approver", "type": "address" } ], "name": "ERC721InvalidApprover", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "operator", "type": "address" } ], "name": "ERC721InvalidOperator", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "owner", "type": "address" } ], "name": "ERC721InvalidOwner", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "receiver", "type": "address" } ], "name": "ERC721InvalidReceiver", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "sender", "type": "address" } ], "name": "ERC721InvalidSender", "type": "error" }, { "inputs": [ { "internalType": "uint256", "name": "tokenId", "type": "uint256" } ], "name": "ERC721NonexistentToken", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "owner", "type": "address" } ], "name": "OwnableInvalidOwner", "type": "error" }, { "inputs": [ { "internalType": "address", "name": "account", "type": "address" } ], "name": "OwnableUnauthorizedAccount", "type": "error" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "address", "name": "owner", "type": "address" }, { "indexed": true, "internalType": "address", "name": "approved", "type": "address" }, { "indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256" } ], "name": "Approval", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "address", "name": "owner", "type": "address" }, { "indexed": true, "internalType": "address", "name": "operator", "type": "address" }, { "indexed": false, "internalType": "bool", "name": "approved", "type": "bool" } ], "name": "ApprovalForAll", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": false, "internalType": "uint256", "name": "_fromTokenId", "type": "uint256" }, { "indexed": false, "internalType": "uint256", "name": "_toTokenId", "type": "uint256" } ], "name": "BatchMetadataUpdate", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": false, "internalType": "uint256", "name": "_tokenId", "type": "uint256" } ], "name": "MetadataUpdate", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "address", "name": "previousOwner", "type": "address" }, { "indexed": true, "internalType": "address", "name": "newOwner", "type": "address" } ], "name": "OwnershipTransferred", "type": "event" }, { "anonymous": false, "inputs": [ { "indexed": true, "internalType": "address", "name": "from", "type": "address" }, { "indexed": true, "internalType": "address", "name": "to", "type": "address" }, { "indexed": true, "internalType": "uint256", "name": "tokenId", "type": "uint256" } ], "name": "Transfer", "type": "event" }, { "inputs": [ { "internalType": "address", "name": "to", "type": "address" }, { "internalType": "uint256", "name": "tokenId", "type": "uint256" } ], "name": "approve", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "owner", "type": "address" } ], "name": "balanceOf", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "tokenId", "type": "uint256" } ], "name": "getApproved", "outputs": [ { "internalType": "address", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "getNextTokenId", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "owner", "type": "address" }, { "internalType": "address", "name": "operator", "type": "address" } ], "name": "isApprovedForAll", "outputs": [ { "internalType": "bool", "name": "", "type": "bool" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "to", "type": "address" }, { "internalType": "string", "name": "tokenURI_", "type": "string" } ], "name": "mintItem", "outputs": [ { "internalType": "uint256", "name": "", "type": "uint256" } ], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [], "name": "name", "outputs": [ { "internalType": "string", "name": "", "type": "string" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "owner", "outputs": [ { "internalType": "address", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "tokenId", "type": "uint256" } ], "name": "ownerOf", "outputs": [ { "internalType": "address", "name": "", "type": "address" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "renounceOwnership", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "from", "type": "address" }, { "internalType": "address", "name": "to", "type": "address" }, { "internalType": "uint256", "name": "tokenId", "type": "uint256" } ], "name": "safeTransferFrom", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "from", "type": "address" }, { "internalType": "address", "name": "to", "type": "address" }, { "internalType": "uint256", "name": "tokenId", "type": "uint256" }, { "internalType": "bytes", "name": "data", "type": "bytes" } ], "name": "safeTransferFrom", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "operator", "type": "address" }, { "internalType": "bool", "name": "approved", "type": "bool" } ], "name": "setApprovalForAll", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "bytes4", "name": "interfaceId", "type": "bytes4" } ], "name": "supportsInterface", "outputs": [ { "internalType": "bool", "name": "", "type": "bool" } ], "stateMutability": "view", "type": "function" }, { "inputs": [], "name": "symbol", "outputs": [ { "internalType": "string", "name": "", "type": "string" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "uint256", "name": "tokenId", "type": "uint256" } ], "name": "tokenURI", "outputs": [ { "internalType": "string", "name": "", "type": "string" } ], "stateMutability": "view", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "from", "type": "address" }, { "internalType": "address", "name": "to", "type": "address" }, { "internalType": "uint256", "name": "tokenId", "type": "uint256" } ], "name": "transferFrom", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [ { "internalType": "address", "name": "newOwner", "type": "address" } ], "name": "transferOwnership", "outputs": [], "stateMutability": "nonpayable", "type": "function" } ];
@@ -118,7 +118,7 @@ if (document.getElementById('auth')) {
   onLogin();
 }
 
-// --- MODIFIED: Seller accepts offer intent (calls backend only) ---
+// --- Seller accepts offer intent ---
 async function acceptOfferIntent(offerId, statusElementId) {
     const statusDiv = document.getElementById(statusElementId);
     statusDiv.textContent = "Notifying server of acceptance...";
@@ -131,7 +131,7 @@ async function acceptOfferIntent(offerId, statusElementId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'accept' })
         });
-        const result = await response.json(); // Result might contain fundingDetails, not used here
+        const result = await response.json();
 
         if (!response.ok || !result.success) {
             throw new Error(result.error || `Server error: ${response.status}`);
@@ -140,7 +140,6 @@ async function acceptOfferIntent(offerId, statusElementId) {
         statusDiv.textContent = `✅ Offer accepted. Waiting for buyer to fund escrow.`;
         statusDiv.className = 'status-message success-message';
 
-        // Reload offers to reflect the change
         loadOffers();
 
     } catch (error) {
@@ -150,7 +149,7 @@ async function acceptOfferIntent(offerId, statusElementId) {
     }
 }
 
-// --- NEW FUNCTION: Buyer funds the escrow after seller accepts intent ---
+// --- Buyer funds the escrow after seller accepts intent ---
 async function fundEscrow(offerId, fundingDetails, statusElementId) {
     const statusDiv = document.getElementById(statusElementId);
     if (!provider || !signer) { statusDiv.textContent = "Error: MetaMask connection issue."; return; }
@@ -177,17 +176,17 @@ async function fundEscrow(offerId, fundingDetails, statusElementId) {
 
         // Call the createEscrow function
         const tx = await escrowContract.createEscrow(
-            fundingDetails.sellerWallet,       // Seller's wallet address
-            fundingDetails.nftContractAddress, // NFT contract
-            fundingDetails.tokenId,            // NFT token ID
-            offerAmountWei,                    // Offer amount in Wei
-            { value: offerAmountWei }          // ETH to send
+            fundingDetails.sellerWallet,       
+            fundingDetails.nftContractAddress, 
+            fundingDetails.tokenId,            
+            offerAmountWei,                 
+            { value: offerAmountWei }         
         );
 
         statusDiv.textContent = `Transaction sent (${tx.hash}). Waiting for confirmation...`;
         console.log("Create Escrow Tx:", tx);
 
-        const receipt = await tx.wait(1); // Wait for 1 confirmation
+        const receipt = await tx.wait(1); 
         console.log("Funding transaction confirmed:", receipt);
 
         // --- Extract Escrow ID from event ---
@@ -202,9 +201,6 @@ async function fundEscrow(offerId, fundingDetails, statusElementId) {
             console.log("Detected EscrowCreated event, Escrow ID:", newEscrowId);
         } else {
             console.error("Could not find EscrowCreated event or escrowId in transaction logs!");
-            // Note: Even if event parsing fails, the escrow *was* created.
-            // Maybe try fetching escrow ID from contract state if possible, or require manual input?
-            // For now, throw error, but a more robust solution might be needed.
              throw new Error("Escrow funded on chain, but failed to retrieve Escrow ID from event logs. Cannot update server.");
         }
 
@@ -223,10 +219,9 @@ async function fundEscrow(offerId, fundingDetails, statusElementId) {
 
         const backendResult = await backendResponse.json();
         if (!backendResponse.ok || !backendResult.success) {
-             // Log error, but the blockchain part succeeded. UI might be slightly inconsistent until reload.
              console.error(`Backend update failed after funding: ${backendResult.error || 'Unknown server error'}`);
              statusDiv.textContent = `⚠️ Escrow funded on blockchain, but server update failed. Status might be inconsistent. Escrow ID: ${newEscrowId}`;
-             statusDiv.className = 'status-message error-message'; // Use error style as a warning
+             statusDiv.className = 'status-message error-message';
         } else {
              statusDiv.textContent = "✅ Escrow funded successfully! Waiting for seller action.";
              statusDiv.className = 'status-message success-message';
@@ -242,13 +237,11 @@ async function fundEscrow(offerId, fundingDetails, statusElementId) {
     }
 }
 
-// --- NEW/REFACTORED FUNCTION: Seller confirms acceptance in contract *after* funding ---
-// (Contains logic previously in the original acceptOffer)
+
 async function confirmSellerAcceptanceInContract(offerId, escrow_id, nftContractAddress, tokenId, statusElementId) {
     const statusDiv = document.getElementById(statusElementId);
     if (!provider || !signer) { statusDiv.textContent = "Error: MetaMask connection issue."; return; }
     if (!ESCROW_CONTRACT_ADDRESS || !ethers.utils.isAddress(ESCROW_CONTRACT_ADDRESS)) { statusDiv.textContent = "Error: Escrow contract address invalid."; return; }
-    // Add checks for ABIs and other params as needed...
 
     statusDiv.textContent = "Processing contract acceptance...";
     statusDiv.className = 'status-message';
@@ -285,7 +278,6 @@ async function confirmSellerAcceptanceInContract(offerId, escrow_id, nftContract
         const response = await fetch(`/api/offers/${offerId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            // --- MODIFIED: New action 'seller_confirmed' ---
             body: JSON.stringify({ action: 'seller_confirmed' })
         });
         const result = await response.json();
@@ -307,9 +299,6 @@ async function confirmSellerAcceptanceInContract(offerId, escrow_id, nftContract
     }
 }
 
-// --- MODIFY declineOffer and cancelOffer ---
-// Needs logic to check offer status before acting.
-// Simplified Example: assumes 'decline' is only for pre-funded states, 'cancel' for funded states
 async function declineOrCancelOffer(offerId, escrow_id, currentStatus, statusElementId, isBuyerCancelling = false) {
     const statusDiv = document.getElementById(statusElementId);
 
@@ -349,7 +338,10 @@ async function declineOrCancelOffer(offerId, escrow_id, currentStatus, statusEle
         }
         statusDiv.textContent = "Processing cancellation on blockchain...";
         statusDiv.className = 'status-message';
-        if (!provider || !signer) { /* ... error handling ... */ return; }
+        if (!provider || !signer) { 
+            console.log("ERROR: Provider or signer undefined"; 
+            return; 
+        }
 
         try {
              const escrowContract = new ethers.Contract(ESCROW_CONTRACT_ADDRESS, ESCROW_CONTRACT_ABI, signer);
@@ -359,7 +351,6 @@ async function declineOrCancelOffer(offerId, escrow_id, currentStatus, statusEle
              await tx.wait(1);
              statusDiv.textContent = "Blockchain cancellation successful! Updating server...";
 
-             // Now update backend (optional, but good practice)
              try {
                 const response = await fetch(`/api/offers/${offerId}`, {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -384,7 +375,7 @@ async function declineOrCancelOffer(offerId, escrow_id, currentStatus, statusEle
     }
 }
 
- // --- ADD: Function to handle Buyer Confirming Receipt ---
+ // --- Function to handle Buyer Confirming Receipt ---
  async function confirmReceipt(offerId, escrowId, statusElementId) {
      const statusDiv = document.getElementById(statusElementId);
      if (!provider || !signer) { statusDiv.textContent = "Error: MetaMask connection issue."; return; }
@@ -441,8 +432,6 @@ async function declineOrCancelOffer(offerId, escrow_id, currentStatus, statusEle
  }
 
 
-// --- ADD: Function to load and display offers ---
-// --- MAJOR UPDATES to loadOffers ---
 async function loadOffers() {
     const incomingList = document.getElementById('incoming-list');
     const outgoingList = document.getElementById('outgoing-list');
@@ -460,10 +449,6 @@ async function loadOffers() {
     noOutgoing.style.display = 'block';
 
     try {
-        // --- MODIFIED: Fetch endpoint needs to return funding details for 'accepted_by_seller' status ---
-        // Ensure /api/offers endpoint in server.js returns offer_amount_eth, seller_wallet,
-        // item_contract_address, and item_token_id when needed.
-        // Modify the SQL query in GET /api/offers in server.js if necessary.
         const response = await fetch('/api/offers');
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
@@ -514,9 +499,7 @@ async function loadOffers() {
                     
                     switch (offer.offer_status) {
                         case 'pending':
-                            // --- MODIFIED: Call acceptOfferIntent ---
                             actionsHtml += `<button onclick="acceptOfferIntent(${offer.offer_id}, '${statusElementId}')">Accept</button>`;
-                            // --- MODIFIED: Call unified decline/cancel function ---
                             actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', false)">Decline</button>`;
                             break;
                         case 'accepted_by_seller':
@@ -524,11 +507,9 @@ async function loadOffers() {
                              // Seller might be able to cancel here too? Add button if needed.
                              actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', false)">Cancel Offer</button>`;
                             break;
-                        case 'active': // Escrow funded, waiting for seller contract acceptance
-                        case 'funded': // Alias for active
-                             // --- MODIFIED: Call confirmSellerAcceptanceInContract ---
+                        case 'active': 
+                        case 'funded': 
                              actionsHtml += `<button onclick="confirmSellerAcceptanceInContract(${offer.offer_id}, ${offer.escrow_id}, '${offer.item_contract_address}', ${offer.item_token_id}, '${statusElementId}')">Confirm Acceptance in Contract</button>`;
-                              // Seller can cancel *funded* escrow before confirming?
                              actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', false)">Cancel Escrow</button>`;
                             break;
                         case 'processing': // Seller accepted in contract, waiting buyer confirm receipt
@@ -546,11 +527,9 @@ async function loadOffers() {
                     switch (offer.offer_status) {
                         case 'pending':
                             actionsHtml += `<span class="status-active">Offer Sent (Awaiting Seller)</span>`;
-                            // --- MODIFIED: Buyer cancels pending offer ---
                             actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', true)">Cancel Offer</button>`;
                             break;
                         case 'accepted_by_seller':
-                             // --- MODIFIED: Add Fund Escrow button ---
                              actionsHtml += `<button onclick='fundEscrow(${offer.offer_id}, ${fundingDetails}, "${statusElementId}")'>Fund Escrow (${offer.offer_amount_eth} ETH)</button>`;
                              // Buyer can cancel before funding
                              actionsHtml += `<button class="cancel-button" onclick="declineOrCancelOffer(${offer.offer_id}, ${offer.escrow_id}, '${offer.offer_status}', '${statusElementId}', true)">Cancel Offer</button>`;
@@ -582,7 +561,7 @@ async function loadOffers() {
             });
         }
     } catch (error) {
-        // ... error handling ...
+        console.log("Error: ", error)
     }
 }
 

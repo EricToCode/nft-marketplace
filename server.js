@@ -3,12 +3,12 @@ const session = require('express-session');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const ethers = require('ethers');
-const axios = require('axios'); // Keep axios if needed elsewhere, fetch used for metadata
+const axios = require('axios');
 const path = require('path');
-const multer = require('multer'); // For handling file uploads
-const pinataSDK = require('@pinata/sdk'); // Pinata SDK for IPFS
-const fs = require('fs'); // File system module for reading uploaded files
-require('dotenv').config(); // Load environment variables from .env file
+const multer = require('multer');
+const pinataSDK = require('@pinata/sdk');
+const fs = require('fs');
+require('dotenv').config();
 
 const app = express();
 
@@ -32,11 +32,11 @@ if (!PINATA_JWT) {
 
     } catch (sdkError) {
         console.error("CRITICAL ERROR: Failed to initialize Pinata SDK (@pinata/sdk).", sdkError);
-        pinata = null; // Ensure pinata is null if initialization fails
+        pinata = null; 
     }
 }
 
-// Ethereum Sepolia Configuration (Ensure these are set in your .env file)
+// Ethereum Sepolia Configuration
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com/"; // Default public node
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY; // Private key of the wallet deploying contracts
 if (!DEPLOYER_PRIVATE_KEY) {
@@ -49,15 +49,12 @@ const signer = DEPLOYER_PRIVATE_KEY ? new ethers.Wallet(DEPLOYER_PRIVATE_KEY, pr
 const NFT_CONTRACT_ADDRESS = process.env.NFT_CONTRACT_ADDRESS;
 if (!NFT_CONTRACT_ADDRESS || !ethers.isAddress(NFT_CONTRACT_ADDRESS)) {
      console.error("CRITICAL ERROR: NFT_CONTRACT_ADDRESS is missing or invalid in .env file. Server cannot mint.");
-     // Optionally exit the process if this is critical: process.exit(1);
 } else {
     console.log(`Using NFT Contract Address: ${NFT_CONTRACT_ADDRESS}`);
 }
 
-// Load ABI from the *new* MarketplaceNFT contract JSON artifact
 let marketplaceContractJson;
 try {
-    // Make sure MarketplaceNFT.json (from compiling MarketplaceNFT.sol) is in the project root
     marketplaceContractJson = require('./MarketplaceNFT.json');
     if (!marketplaceContractJson || !marketplaceContractJson.abi) {
         throw new Error("ABI missing from MarketplaceNFT.json");
@@ -65,28 +62,26 @@ try {
     console.log("MarketplaceNFT ABI loaded successfully.");
 } catch (error) {
     console.error("CRITICAL ERROR loading ./MarketplaceNFT.json. Ensure the file exists and is valid.", error);
-    marketplaceContractJson = null; // Set to null to prevent errors later if loading failed
-    // Optionally exit the process: process.exit(1);
+    marketplaceContractJson = null; 
+
 }
 
-// Multer Configuration (Store temporary uploads in 'uploads/' directory)
 const uploadDir = 'uploads/';
-if (!fs.existsSync(uploadDir)){ // Create uploads directory if it doesn't exist
+if (!fs.existsSync(uploadDir)){
     fs.mkdirSync(uploadDir);
 }
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, uploadDir); // Files will be saved in the 'uploads' directory
+        cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
-        // Create a unique filename to avoid collisions
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 const upload = multer({ storage: storage });
 
-// --- Middleware ---
+
 // Body Parser for JSON payloads
 app.use(bodyParser.json());
 // Session Management
@@ -94,9 +89,8 @@ app.use(session({ secret: 'replace_this_with_a_strong_secret!', resave: false, s
 // Serve Static Files (HTML, CSS, JS from 'public' directory)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- Constants ---
+
 const CATEGORIES = ['watches', 'pokemon']; // Supported categories
-// const IPFS_GATEWAY_PREFIX = "https://ipfs.io/ipfs/"; // ipfs.io block web scripts
 const IPFS_GATEWAY_PREFIX = "https://gateway.pinata.cloud/ipfs/"
 
 // --- Database Setup ---
@@ -142,8 +136,6 @@ db.serialize(() => {
             console.error("Error checking for items table:", err.message);
             return;
         }
-        // Uncomment the following line ONLY if you are SURE you want to reset the items table on every server start
-        // if (row) { db.run(`DROP TABLE items`, (err) => { if(err) console.error("Error dropping items table:", err.message); else console.log("Dropped existing items table."); }); }
 
         // Create items table if it doesn't exist (or after dropping)
         db.run(`CREATE TABLE IF NOT EXISTS items (
@@ -194,7 +186,7 @@ function cleanupFiles(files) {
             if (err) {
                 console.error(`Error deleting temporary file ${filePath}:`, err);
             } else {
-                // console.log(`Deleted temporary file: ${filePath}`); // Optional: uncomment for debugging
+                // console.log(`Deleted temporary file: ${filePath}`); 
             }
         });
     });
@@ -206,7 +198,6 @@ function cleanupFiles(files) {
 app.post('/api/register', (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-    // NOTE: In production, hash passwords using bcrypt before storing!
     db.run(`INSERT INTO users(username, password) VALUES(?, ?)`, [username, password], function (err) {
         if (err) {
             console.error("Registration error:", err.message);
@@ -222,7 +213,6 @@ app.post('/api/register', (req, res) => {
 // User Login
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
-    // NOTE: In production, compare hashed passwords!
     db.get(`SELECT id, username, wallet FROM users WHERE username = ? AND password = ?`, [username, password], (err, row) => {
         if (err) {
             console.error("Login DB error:", err.message);
@@ -251,8 +241,7 @@ app.post('/api/logout', (req, res) => {
           res.status(500).json({ success: false, error: 'Could not log out, please try again.' });
         } else {
           // Session destroyed successfully
-          // Optionally clear the cookie explicitly, though destroy usually handles it
-          res.clearCookie('connect.sid'); // Use your session cookie name if different
+          res.clearCookie('connect.sid');
           console.log("User logged out successfully.");
           res.status(200).json({ success: true, message: 'Logged out successfully' });
         }
@@ -315,7 +304,6 @@ app.get('/api/categories', (req, res) => { // No login required to see categorie
 });
 
 
-// List an *Existing* NFT (Fetch metadata and save)
 app.post('/api/items', ensureLoggedIn, async (req, res) => {
     const { category, contractAddress, tokenId } = req.body;
     const userWallet = req.session.wallet;
@@ -326,7 +314,7 @@ app.post('/api/items', ensureLoggedIn, async (req, res) => {
     if (!CATEGORIES.includes(category)) return res.status(400).json({ error: 'Unsupported category.' });
     if (!contractAddress || !tokenId) return res.status(400).json({ error: 'Contract address and Token ID are required.' });
     if (!ethers.isAddress(contractAddress)) return res.status(400).json({ error: 'Invalid contract address format.' });
-    // Basic check for tokenId format (can be improved)
+
      if (isNaN(parseInt(tokenId)) || BigInt(tokenId) < 0) {
         return res.status(400).json({ error: 'Invalid Token ID format.' });
     }
@@ -428,9 +416,6 @@ app.post('/api/items', ensureLoggedIn, async (req, res) => {
         } else if (typeof metadata.image_url === 'string') {
              front_image = metadata.image_url;
         }
-        // Normalize IPFS links if needed (optional, depends if you store full URL or just CID)
-        // if (front_image.startsWith(IPFS_GATEWAY_PREFIX)) front_image = `ipfs://${front_image.substring(IPFS_GATEWAY_PREFIX.length)}`;
-        // if (back_image.startsWith(IPFS_GATEWAY_PREFIX)) back_image = `ipfs://${back_image.substring(IPFS_GATEWAY_PREFIX.length)}`;
 
         let serial_number = '', case_color = '', dial_color = '', rarity = '', set_number = '';
         if (Array.isArray(metadata.attributes)) {
@@ -538,22 +523,21 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
 
     // --- 1. Preliminary Checks ---
     if (!userWallet) { /* ... */ }
-    // --- CHANGE: Check if @pinata/sdk is initialized ---
     if (!pinata) {
         cleanupFiles(req.files);
         // Added note about API Keys
         return res.status(500).json({ error: 'Server configuration error: Pinata SDK not initialized. Check API Key/Secret.' });
     }
-    // --- END CHANGE ---
-    if (!signer) { /* ... */ }
-    if (!NFT_CONTRACT_ADDRESS) { /* ... */ }
-    if (!marketplaceContractJson) { /* ... */ }
+
+    if (!signer) { console.log("ERROR: Signer undefined") }
+    if (!NFT_CONTRACT_ADDRESS) { console.log("ERROR: NFT contract address undefined") }
+    if (!marketplaceContractJson) { console.log("ERROR: Marketplace contract JSON undefined") }
 
     console.log(`\n--- Starting NFT Mint Request for User ID: ${userId}, Wallet: ${userWallet} ---`);
     console.log(`Using pre-deployed contract: ${NFT_CONTRACT_ADDRESS}`);
 
     try {
-        // --- 2. Extract & Validate Input Data --- (Keep as is)
+        // --- 2. Extract & Validate Input Data ---
         const {
             name, description, category, // Common fields
             serialNumber, caseColor, dialColor, // Watch fields
@@ -561,7 +545,7 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
         } = req.body;
         const frontFile = req.files?.frontImage?.[0];
         const backFile = req.files?.backImage?.[0];
-        /* ... logging and validation ... */
+
         if (!frontFile.path || !fs.existsSync(frontFile.path)) { /* ... */ }
         if (!backFile.path || !fs.existsSync(backFile.path)) { /* ... */ }
 
@@ -581,11 +565,11 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
         // --- 3. Upload Images to IPFS via Pinata ---
         console.log("Uploading images to Pinata using @pinata/sdk...");
         try {
-            // --- CHANGE: Use pinFileToIPFS method ---
+
             const frontStream = fs.createReadStream(frontFile.path);
             const frontPinOptions = {
                 pinataMetadata: { name: `WatchFront_${name.replace(/\s+/g, '_')}_${Date.now()}${path.extname(frontFile.originalname)}` }
-                // pinataOptions: { cidVersion: 1 } // Optional: Use CID v1
+                // pinataOptions: { cidVersion: 1 } 
             };
             const frontResult = await pinata.pinFileToIPFS(frontStream, frontPinOptions);
             frontIpfsHash = frontResult?.IpfsHash; // Extract IpfsHash
@@ -600,10 +584,10 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
             backIpfsHash = backResult?.IpfsHash; // Extract IpfsHash
             if (!backIpfsHash) throw new Error("Pinata pinFileToIPFS for back image returned invalid hash.");
             console.log(`Back image uploaded: ${backIpfsHash}`);
-            // --- END CHANGE ---
+
         } catch (pinError) {
             console.error("Error uploading images to Pinata:", pinError.message || pinError);
-            // --- CHANGE: Check for API Key specific errors ---
+
             if (pinError.message?.includes('Authentication failed') || pinError.message?.includes('Invalid authentication')) {
                  throw new Error('Failed to upload images to IPFS: Invalid Pinata API Key or Secret.');
             } else if (pinError.response?.data?.error) {
@@ -612,7 +596,7 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
             } else {
                  throw new Error(`Failed to upload images to IPFS. ${pinError.message}`);
             }
-            // --- END CHANGE ---
+
         }
 
         // --- 4. Create Metadata JSON ---
@@ -647,7 +631,7 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
         try {
             const metaPinOptions = {
                 pinataMetadata: { name: `Metadata_${name.replace(/\s+/g, '_')}_${Date.now()}.json` }
-                // pinataOptions: { cidVersion: 1 } // Optional
+                // pinataOptions: { cidVersion: 1 }
             };
             const metadataResult = await pinata.pinJSONToIPFS(metadata, metaPinOptions);
             metadataIpfsHash = metadataResult?.IpfsHash; // Extract IpfsHash
@@ -658,7 +642,7 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
 
         } catch (pinError) {
             console.error("Error uploading metadata to Pinata:", pinError.message || pinError);
-             // --- Check for API Key specific errors ---
+
              if (pinError.message?.includes('Authentication failed') || pinError.message?.includes('Invalid authentication')) {
                  throw new Error('Failed to upload metadata to IPFS: Invalid Pinata API Key or Secret.');
             } else if (pinError.response?.data?.error) {
@@ -669,10 +653,10 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
             }
         }
 
-        // --- Pre-Mint Validation --- (Keep as is)
-        if (!tokenURI || !userWallet || !ethers.isAddress(userWallet)) { /* ... */ }
+        // --- Pre-Mint Validation --- 
+        if (!tokenURI || !userWallet || !ethers.isAddress(userWallet)) { console.log("ERROR: Error during pre-mint validation") }
 
-        // --- 6. Mint NFT by Calling the Pre-deployed Contract --- (Keep as is)
+        // --- 6. Mint NFT by Calling the Pre-deployed Contract ---
         console.log(`Preparing to mint NFT on contract ${NFT_CONTRACT_ADDRESS}...`);
         let mintTransaction;
         let newlyMintedTokenId;
@@ -680,7 +664,7 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
             const nftContract = new ethers.Contract(NFT_CONTRACT_ADDRESS, marketplaceContractJson.abi, signer);
             mintTransaction = await nftContract.mintItem(userWallet, tokenURI);
             const receipt = await mintTransaction.wait(1);
-            /* ... parse logs to get newlyMintedTokenId ... */
+
             const transferEventInterface = new ethers.Interface(marketplaceContractJson.abi);
             const transferEventLog = receipt.logs.find(log => log.topics[0] === '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef');
             if (transferEventLog) {
@@ -734,7 +718,7 @@ app.post('/api/mint-nft', ensureLoggedIn, upload.fields([
             mintTxHash: mintTransaction.hash     // The transaction hash
         });
 
-    } catch (error) { // Catch errors from validation, Pinata uploads, or pre-mint checks
+    } catch (error) { 
         console.error("\n--- ERROR DURING NFT MINTING PROCESS (Before Transaction) ---");
         console.error(error);
         cleanupFiles(req.files);
@@ -825,15 +809,15 @@ app.get('/api/offers/history', ensureLoggedIn, (req, res) => {
 
 // Place an Offer (Record intent, NO escrow details initially)
 app.post('/api/offers', ensureLoggedIn, (req, res) => {
-    // --- MODIFIED: Removed escrowContractAddress, escrowId, txHash from expected body ---
+    // --- Removed escrowContractAddress, escrowId, txHash from expected body ---
     const { itemId, offerAmountEth } = req.body;
     const buyerUserId = req.session.user.id;
 
-    // --- MODIFIED: Validation updated ---
+    // --- Validation updated ---
     if (!itemId || !offerAmountEth) {
         return res.status(400).json({ error: 'Missing required offer details: itemId, offerAmountEth.' });
     }
-    // Validate offerAmountEth format (simple check)
+    // Validate offerAmountEth format
     if (isNaN(parseFloat(offerAmountEth)) || parseFloat(offerAmountEth) <= 0) { // Ensure positive value
         return res.status(400).json({ error: 'Invalid offer amount format.' });
     }
@@ -857,7 +841,7 @@ app.post('/api/offers', ensureLoggedIn, (req, res) => {
             INSERT INTO offers (item_id, buyer_user_id, seller_user_id, offer_amount_eth, status, updated_at)
             VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         `;
-        // --- MODIFIED: Params updated, status set to 'pending' ---
+        // --- Params updated, status set to 'pending' ---
         const params = [
             itemId, buyerUserId, sellerUserId, String(offerAmountEth), 'pending' // Initial status is pending
         ];
@@ -868,17 +852,17 @@ app.post('/api/offers', ensureLoggedIn, (req, res) => {
                 return res.status(500).json({ error: "Failed to save offer." });
             }
             console.log(`Offer created successfully with ID: ${this.lastID} (status: pending) for item ID: ${itemId}`);
-            // TODO: Potentially notify the seller
+
             return res.json({ success: true, offerId: this.lastID });
         });
     });
 });
 
 
-// Modify PUT /api/offers/:offerId to handle new actions and return data for funding
+
 app.put('/api/offers/:offerId', ensureLoggedIn, (req, res) => {
     const offerId = req.params.offerId;
-    // --- MODIFIED: Added 'seller_confirmed' action ---
+
     const { action } = req.body; // 'accept', 'decline', 'confirmReceived', 'seller_confirmed' (New: after seller accepts in contract)
     const userId = req.session.user.id;
 
@@ -887,7 +871,6 @@ app.put('/api/offers/:offerId', ensureLoggedIn, (req, res) => {
     }
 
     // Fetch offer details along with item details needed for funding/contract interaction
-    // --- MODIFIED: Joined with items table ---
     const sqlFetchOffer = `
         SELECT
             o.id, o.buyer_user_id, o.seller_user_id, o.status, o.item_id, o.offer_amount_eth,
@@ -913,7 +896,7 @@ app.put('/api/offers/:offerId', ensureLoggedIn, (req, res) => {
         switch (action) {
             case 'decline': // Handles Seller Decline OR Buyer Cancel (before funding)
                 allowedUserIds = [offer.seller_user_id, offer.buyer_user_id];
-                // --- MODIFIED: Can decline/cancel 'pending' or 'accepted_by_seller' ---
+                // --- Can decline/cancel 'pending' or 'accepted_by_seller' ---
                 allowedCurrentStatus = ['pending', 'accepted_by_seller'];
                 // Decline always goes to 'declined', regardless of who initiated
                 newStatus = 'declined';
@@ -922,7 +905,7 @@ app.put('/api/offers/:offerId', ensureLoggedIn, (req, res) => {
                 allowedUserIds = [offer.seller_user_id];
                 allowedCurrentStatus = ['pending']; // Only from pending
                 newStatus = 'accepted_by_seller'; // New status indicating seller agreed
-                // --- MODIFIED: Return data needed for buyer to fund escrow ---
+                // --- Return data needed for buyer to fund escrow ---
                 responseData = {
                      success: true,
                      newStatus: newStatus,
@@ -934,7 +917,7 @@ app.put('/api/offers/:offerId', ensureLoggedIn, (req, res) => {
                      }
                  };
                 break;
-             // --- NEW ACTION: seller_confirmed (Seller calls acceptOffer on contract *after* buyer funds) ---
+             // --- seller_confirmed (Seller calls acceptOffer on contract *after* buyer funds) ---
              case 'seller_confirmed':
                 allowedUserIds = [offer.seller_user_id];
                 allowedCurrentStatus = ['active', 'funded']; // Should be called when escrow is funded
@@ -995,14 +978,14 @@ app.put('/api/offers/:offerId', ensureLoggedIn, (req, res) => {
              }
 
             console.log(`Offer ${offerId} status successfully updated to ${newStatus} by user ${userId} (Role: ${userId === offer.buyer_user_id ? 'buyer' : 'seller'})`);
-             // --- MODIFIED: Return potentially enriched responseData ---
+             // --- Return potentially enriched responseData ---
              responseData.newStatus = newStatus; // Ensure newStatus is in response
              return res.json(responseData);
         });
     });
 });
 
-// --- NEW ENDPOINT: Buyer confirms funding ---
+// --- Buyer confirms funding ---
 app.post('/api/offers/:offerId/fund', ensureLoggedIn, (req, res) => {
     const offerId = req.params.offerId;
     const { escrowContractAddress, escrowId, txHash } = req.body;
@@ -1043,19 +1026,19 @@ app.post('/api/offers/:offerId/fund', ensureLoggedIn, (req, res) => {
                 }
 
                 console.log(`Offer ${offerId} successfully updated with funding details. Status: ${newStatus}`);
-                 // TODO: Notify Seller that escrow is funded
+                 
                 return res.json({ success: true, newStatus: newStatus });
             }
         );
     });
 });
 
-// --- ADDED: Item Deletion ---
+// --- Item Deletion ---
 app.delete('/api/items/:id', ensureLoggedIn, (req, res) => {
     const itemId = req.params.id;
     const userId = req.session.user.id;
 
-    // Check if the user owns the item and it's in a deletable state (e.g., 'listed')
+    // Check if the user owns the item and it's in a deletable state
     db.get(`SELECT id FROM items WHERE id = ? AND user_id = ? AND status = 'listed'`, [itemId, userId], (err, item) => {
          if (err) { return res.status(500).json({ error: "Database error checking item ownership." }); }
          if (!item) { return res.status(403).json({ error: "Item not found, not owned by you, or not in 'listed' status." }); }
