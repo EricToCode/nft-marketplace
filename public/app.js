@@ -339,7 +339,7 @@ async function declineOrCancelOffer(offerId, escrow_id, currentStatus, statusEle
         statusDiv.textContent = "Processing cancellation on blockchain...";
         statusDiv.className = 'status-message';
         if (!provider || !signer) { 
-            console.log("ERROR: Provider or signer undefined"; 
+            console.log("ERROR: Provider or signer undefined");
             return; 
         }
 
